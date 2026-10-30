@@ -1,0 +1,98 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap");
+
+:root {
+  --sl-bg: #f4f6f8;
+  --sl-surface: #ffffff;
+  --sl-border: #d8dee6;
+  --sl-text: #1a2332;
+  --sl-text-muted: #5c6b7a;
+  --sl-brand: #1a2332;
+  --sl-accent: #c45c26;
+  --sl-accent-soft: #f3e6de;
+  --sl-ok: #0f766e;
+  --sl-ok-soft: #e6f2f1;
+  --sl-warn: #b45309;
+  --sl-error: #b42318;
+  --sl-error-soft: #fceceb;
+  --sl-radius: 6px;
+  --sl-space-3: 16px;
+  --sl-space-4: 24px;
+  --sl-font: "IBM Plex Sans", "Source Sans 3", sans-serif;
+  --sl-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+html, body, [class*="css"] {
+  font-family: var(--sl-font);
+  color: var(--sl-text);
+}
+
+.sl-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px var(--sl-space-4);
+  background: var(--sl-surface);
+  border-bottom: 1px solid var(--sl-border);
+  margin: -1rem -1rem 1.25rem -1rem;
+}
+
+.sl-brand {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--sl-brand);
+}
+
+.sl-mode {
+  font-family: var(--sl-mono);
+  font-size: 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--sl-border);
+  border-radius: var(--sl-radius);
+  text-transform: uppercase;
+}
+
+.sl-mode-error {
+  background: var(--sl-error-soft);
+  border-color: var(--sl-error);
+  color: var(--sl-error);
+}
+
+.sl-error {
+  background: var(--sl-error-soft);
+  border-left: 3px solid var(--sl-error);
+  padding: 12px 16px;
+  border-radius: var(--sl-radius);
+  margin-bottom: 1rem;
+}
+
+.sl-error code {
+  font-family: var(--sl-mono);
+  font-size: 12px;
+  color: var(--sl-error);
+}
+
+.sl-error .hint {
+  color: var(--sl-text-muted);
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.sl-footer {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--sl-border);
+  color: var(--sl-text-muted);
+  font-size: 12px;
+}
+
+.sl-empty {
+  text-align: center;
+  color: var(--sl-text-muted);
+  padding: 3rem 1rem;
+}
+
+section[data-testid="stSidebar"] {
+  background: var(--sl-surface);
+  border-right: 1px solid var(--sl-border);
+}

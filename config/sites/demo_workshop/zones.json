@@ -1,0 +1,30 @@
+{
+  "walkways": [
+    {
+      "zone_id": "walkway_main",
+      "polygon_plan": [[1.0, 2.0], [5.0, 2.0], [5.0, 3.2], [1.0, 3.2]]
+    }
+  ],
+  "exits": [
+    {
+      "exit_id": "exit_east",
+      "door_point": [6.0, 4.0],
+      "clearance_polygon": [[5.0, 3.0], [7.0, 3.0], [7.0, 5.0], [5.0, 5.0]],
+      "min_clear_width_m": 0.9
+    }
+  ],
+  "heat_sources": [
+    {
+      "source_id": "heater_1",
+      "point": [3.0, 4.5],
+      "radius_m": 1.0
+    }
+  ],
+  "electrical_sources": [
+    {
+      "source_id": "power_strip_1",
+      "point": [2.0, 5.5],
+      "radius_m": 0.5
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{"frame_id": "frm_000", "camera_id": "cam_01", "timestamp": 0.0, "label": "object_on_floor", "score": 0.91, "bbox_xyxy": [400, 380, 520, 480], "metadata": {"backend": "replay", "family_hint": "slip_trip"}}
+{"frame_id": "frm_000", "camera_id": "cam_01", "timestamp": 0.0, "label": "person", "score": 0.88, "bbox_xyxy": [200, 200, 320, 520], "metadata": {"backend": "replay"}}
+{"frame_id": "frm_001", "camera_id": "cam_01", "timestamp": 0.5, "label": "object_on_floor", "score": 0.89, "bbox_xyxy": [405, 385, 525, 485], "metadata": {"backend": "replay"}}
+{"frame_id": "frm_001", "camera_id": "cam_01", "timestamp": 0.5, "label": "heater", "score": 0.84, "bbox_xyxy": [560, 250, 680, 400], "metadata": {"backend": "replay"}}
+{"frame_id": "frm_002", "camera_id": "cam_01", "timestamp": 1.0, "label": "cardboard_box", "score": 0.86, "bbox_xyxy": [570, 260, 700, 420], "metadata": {"backend": "replay"}}
+{"frame_id": "frm_002", "camera_id": "cam_01", "timestamp": 1.0, "label": "heater", "score": 0.82, "bbox_xyxy": [560, 250, 680, 400], "metadata": {"backend": "replay"}}
+{"frame_id": "frm_003", "camera_id": "cam_01", "timestamp": 1.5, "label": "pallet", "score": 0.9, "bbox_xyxy": [820, 300, 980, 500], "metadata": {"backend": "replay", "family_hint": "egress"}}
+{"frame_id": "frm_004", "camera_id": "cam_01", "timestamp": 2.0, "label": "power_strip", "score": 0.87, "bbox_xyxy": [300, 420, 380, 480], "metadata": {"backend": "replay"}}
+{"frame_id": "frm_004", "camera_id": "cam_01", "timestamp": 2.0, "label": "extension_cord", "score": 0.8, "bbox_xyxy": [320, 400, 450, 470], "metadata": {"backend": "replay"}}

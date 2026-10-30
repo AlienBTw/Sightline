@@ -1,0 +1,88 @@
+slip_trip:
+  enabled: true
+  classes:
+    - spill
+    - cable
+    - tool
+    - box
+    - bucket
+    - pallet
+    - wood
+    - rag
+    - object on floor
+    - cardboard box
+  zones:
+    - walkway
+  min_duration_s: 3
+  severity:
+    base: 0.55
+    spill_multiplier: 1.3
+    large_object_multiplier: 1.2
+
+fire_heat:
+  enabled: true
+  heat_classes:
+    - space heater
+    - heater
+    - grinder
+    - torch
+    - hot work
+  fuel_classes:
+    - cardboard
+    - cardboard box
+    - paper
+    - rag
+    - solvent can
+    - wood pallet
+    - box
+  fuel_near_heat_radius_m: 1.0
+  vlm_required_for:
+    - source_active
+    - material
+  severity:
+    base: 0.65
+    active_heat_multiplier: 1.4
+    extinguisher_far_multiplier: 1.15
+
+egress:
+  enabled: true
+  blocking_classes:
+    - pallet
+    - box
+    - cardboard box
+    - tool
+    - bucket
+    - cable
+    - wood
+    - bin
+  min_clear_width_m: 0.9
+  min_duration_s: 3
+  severity:
+    base: 0.7
+    blocked_exit_multiplier: 1.4
+
+electrical:
+  enabled: true
+  electrical_classes:
+    - power strip
+    - outlet
+    - panel
+    - cable
+  risk_classes:
+    - spill
+    - liquid
+    - solvent can
+    - cardboard
+    - rag
+    - extension cord
+  radius_m: 0.5
+  severity:
+    base: 0.6
+    liquid_multiplier: 1.4
+
+other:
+  enabled: true
+  classes: []
+  severity:
+    base: 0.4
+

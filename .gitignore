@@ -1,0 +1,48 @@
+# Secrets — commit .env.example only
+.env
+.env.local
+.env.*.local
+
+# Local progress trackers (not for GitHub)
+progress/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Media and weights (keep out of public history)
+data/clips/
+data/raw/
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.onnx
+!config/**
+
+# Runtime
+*.db
+*.sqlite
+*.sqlite3
+/crops/
+/tmp/

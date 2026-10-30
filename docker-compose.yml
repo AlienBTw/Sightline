@@ -1,0 +1,42 @@
+# Local stack. Set SIGHTLINE_MODE / DETECTOR_BACKEND in .env (replay or live).
+# Local Muse Glimmer (Ollama) in a container: docker compose --profile ollama up --build
+#   then: docker compose exec ollama ollama pull muse-glimmer:30b
+#   and set OLLAMA_BASE_URL / VLM_BASE_URL to http://ollama:11434/v1 in .env
+# If Ollama already runs on the host, skip the profile and use http://host.docker.internal:11434/v1.
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+      - ./replay:/app/replay
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+    ports:
+      - "8501:8501"
+    environment:
+      API_URL: http://api:8000
+    depends_on:
+      - api
+
+  ollama:
+    profiles: ["ollama"]
+    build:
+      context: .
+      dockerfile: docker/ollama.Dockerfile
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+
+volumes:
+  ollama_models:

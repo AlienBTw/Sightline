@@ -1,0 +1,16 @@
+detector_prompts:
+  - cardboard
+  - paper
+  - rag
+  - solvent can
+  - wood pallet
+  - space heater
+  - grinder
+  - power strip
+  - extinguisher
+  - cable
+  - tool
+  - box
+  - bucket
+  - spill
+  - person

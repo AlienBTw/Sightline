@@ -1,0 +1,28 @@
+detection:
+  min_class_score: 0.35
+  nms_iou_threshold: 0.5
+
+candidate:
+  min_confirm_seconds: 3
+  max_gap_seconds: 5
+  min_detections_to_confirm: 3
+  match_radius_m: 0.5
+
+fix:
+  fix_debounce_seconds: 10
+  verify_seconds: 30
+
+vlm:
+  gate_probability_low: 0.55
+  gate_probability_high: 0.70
+  # Enable when VLM_BASE_URL is set (live, e.g. local Ollama Muse Glimmer). Empty for local replay without VLM —
+  # gated candidates still fail loud if mid-band probability requires the gate.
+  always_gate: []
+  # Recommended live:
+  # always_gate: [fire_heat, electrical]
+  timeout_s: 60
+  max_retries: 1
+
+decide:
+  abstain_low: 0.35
+  abstain_high: 0.65

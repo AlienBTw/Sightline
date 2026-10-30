@@ -1,0 +1,30 @@
+{
+  "cameras": [
+    {
+      "camera_id": "cam_01",
+      "name": "Workshop Bay 1",
+      "source": "",
+      "frame_width": 1280,
+      "frame_height": 720,
+      "sampling_fps": 2,
+      "plan_id": "demo_workshop",
+      "pixel_points": [
+        [120, 540],
+        [980, 560],
+        [1010, 300],
+        [180, 310]
+      ],
+      "plan_points": [
+        [0.5, 7.0],
+        [6.0, 7.0],
+        [6.0, 2.0],
+        [0.5, 2.0]
+      ],
+      "known_length_m": 5.5,
+      "known_length_plan_p1": [0.5, 7.0],
+      "known_length_plan_p2": [6.0, 7.0],
+      "units": "metres",
+      "notes": "Plan points are in metres on the demo_workshop floor plan. Re-pick pixel_points after mounting the camera."
+    }
+  ]
+}

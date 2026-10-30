@@ -1,0 +1,29 @@
+{
+  "n_train": 150,
+  "n_val": 50,
+  "brier": 0.07218181818181818,
+  "log_loss": 0.22429525125702734,
+  "ece": 2.4424906541753444e-17,
+  "feature_names": [
+    "detector_score",
+    "duration_seconds",
+    "in_walkway",
+    "in_exit_clearance",
+    "distance_to_heat_m",
+    "distance_to_exit_m",
+    "distance_to_power_m",
+    "clear_width_m",
+    "vlm_called",
+    "vlm_source_active",
+    "vlm_material_combustible",
+    "vlm_liquid_present",
+    "rule_score",
+    "severity_prior",
+    "family_slip_trip",
+    "family_fire_heat",
+    "family_egress",
+    "family_electrical",
+    "family_other"
+  ],
+  "label_source": "data\\models\\bootstrap_labels.csv"
+}

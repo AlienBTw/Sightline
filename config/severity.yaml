@@ -1,0 +1,7 @@
+# Base severity priors by family (0–1). Multipliers live in hazards.yaml.
+family_base:
+  slip_trip: 0.55
+  fire_heat: 0.65
+  egress: 0.7
+  electrical: 0.6
+  other: 0.5
