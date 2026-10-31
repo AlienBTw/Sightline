@@ -5,6 +5,7 @@ numpy>=1.26
 opencv-python-headless>=4.8
 PyYAML>=6.0
 pytest>=8.0
-# Later phases (03-features / 04-head) - V-JEPA 2.1 needs PyTorch with CUDA:
-# torch>=2.2  (install the CUDA build from pytorch.org, not from PyPI defaults)
-# timm, einops  (vjepa2 repo dependencies - confirm against its requirements.txt in 03-features)
+# Phases 03-features / 04-head (installed in WSL ~/vjepa-venv; see 03-features/README.md):
+# torch>=2.13 with CUDA (cu132 build from download.pytorch.org, not PyPI defaults)
+# timm, einops, scikit-learn  (+ the facebookresearch/vjepa2 repo cloned to ~/vjepa2)
+scikit-learn>=1.4
