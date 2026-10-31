@@ -1,7 +1,9 @@
-# Secrets — commit .env.example only
+# Secrets: commit .env.example only
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+*.pem
+*.key
 
 # Local progress trackers (not for GitHub)
 progress/
@@ -9,6 +11,8 @@ progress/
 # Python
 .venv/
 venv/
+env/
+*-venv/
 __pycache__/
 *.py[cod]
 *$py.class
@@ -23,22 +27,71 @@ build/
 # OS / IDE
 .DS_Store
 Thumbs.db
+desktop.ini
 .idea/
 .vscode/
+*.swp
 
-# Media and weights (keep out of public history)
+# Node / Expo / Android (mobile app)
+node_modules/
+.expo/
+.expo-shared/
+web-build/
+android/build/
+android/app/build/
+android/.gradle/
+**/android/build/
+**/android/app/build/
+**/android/.gradle/
+ios/Pods/
+*.apk
+*.aab
+*.keystore
+*.jks
+npm-debug.log*
+yarn-error.log*
+
+# Media and weights (keep out of history)
 data/clips/
 data/raw/
+data/datasets/
+data/features/
 *.mp4
 *.avi
 *.mov
 *.mkv
+*.webm
 *.pt
 *.pth
 *.bin
+*.ckpt
 *.safetensors
+*.gguf
 *.onnx
+*.engine
 !config/**
+
+# Bulk images, features and archives in data/output folders
+data/**/*.png
+data/**/*.jpg
+data/**/*.jpeg
+outputs/**/*.png
+outputs/**/*.jpg
+outputs/**/*.jpeg
+**/features/
+*.npy
+*.npz
+*.h5
+*.hdf5
+*.parquet
+*.part
+*.tar.gz.part-*
+checkpoints/
+weights/
+runs/
+wandb/
+logs/
+*.log
 
 # Runtime
 *.db

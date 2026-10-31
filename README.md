@@ -6,7 +6,9 @@ Sightline is being built for the **Meta Global AI Developer Hackathon** (Indie t
 
 > **Disclaimer:** Sightline is a decision-support demo. It is **not** a certified safety system and must not replace formal EHS controls, inspections, or regulatory compliance.
 
-> **Status:** the code in this folder is the **pre-event MVP** (written Oct 13–14, before the Meta event started on Oct 26). It is kept as **reference only**. The Meta build plan in [`../PLAN.md`](../PLAN.md) rebuilds the core pipeline during the event window (the participant guide reportedly requires new work).
+> **Status:** repo `AlienBTw/Sightline` (private, `main`, fresh history from Oct 30). The code currently here is the **pre-event MVP** (written Oct 13–14, before the Meta event started on Oct 26), kept as **reference only**. The core pipeline is rebuilt during the event window (the participant guide reportedly requires new work). The build plan lives outside this repo, in the hackathon planning folder (`PLAN.md`, `18-mobile-app.md`).
+
+> **Product direction:** after the models are trained, a mobile app lets workshop supervisors watch their existing cameras live, get hazard push notifications and review flagged clips with the circle overlay. The Streamlit UI in this repo becomes the internal/dev console.
 
 ## Target stack (Meta build)
 
@@ -115,7 +117,7 @@ Code: MIT (see [LICENSE](LICENSE)). **Verify weight licences before going public
 | HistGB | scikit-learn (BSD) | Local `.joblib` artifact |
 | **Banned** | Ultralytics / YOLO-World / YOLOv8 | AGPL/GPL — not used |
 
-Datasets: only permissive licences (CC BY / CC0 / MIT) because the hackathon rules grant the organisers an any-purpose licence to submissions. See [`../17-meta-hackathon-rules.md`](../17-meta-hackathon-rules.md).
+Datasets: only permissive licences (CC BY / CC0 / MIT) because the hackathon rules grant the organisers an any-purpose licence to submissions. See `17-meta-hackathon-rules.md` in the planning folder (outside this repo).
 
 Detector backends are selected only via `DETECTOR_BACKEND` — never auto-cascaded.
 
