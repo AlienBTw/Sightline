@@ -63,7 +63,7 @@ Training PC, Oct 30 (Tunis):
 | `--sources zenodo --zenodo-parts 1` | part-aa md5 OK, 1.0 GiB in 294 s (3.5 MiB/s, single stream). 1,307 files extracted in 18 s → **649 images in the manifest** |
 | `--sources zenodo --workers 8` (all 39 parts) | **39/39 md5 OK**, 37.6 GiB new in 6,491 s (5.9 MiB/s). Extraction verified complete: 37,650 files, 40.7 GiB, **18,953 images in the manifest** (18,690 with paired labels) |
 
-Throughput: the line is capped at about **5.7 MiB/s (about 48 Mbit/s)**. A single stream reaches about 3.8 MiB/s from HF and about 2.2 MiB/s from Zenodo. 16 workers saturate the line, and 32 workers don't help (5.7 MiB/s). `huggingface_hub` `snapshot_download` with hf_xet high-performance was slower (4.7 MiB/s). See LOG.md.
+Throughput: the line is capped at about **5.7 MiB/s (about 48 Mbit/s)**. A single stream reaches about 3.8 MiB/s from HF and about 2.2 MiB/s from Zenodo. 16 workers saturate the line, and 32 workers don't help (5.7 MiB/s). `huggingface_hub` `snapshot_download` with hf_xet high-performance was slower (4.7 MiB/s).
 
 **Manifest (Voxel51):** 691 records (566 train / 125 test), 658 unique by sha256.
 
@@ -119,5 +119,5 @@ Factor hints after merging across duplicates:
 - Zenodo is **images, not video**. It's useful for F1 (hand near blade), F4 (gloves) and localization checks, but not for the temporal factors.
 - Zenodo is fully downloaded and extracted (Oct 31). Only `obj_Inpaint_data` (263 images) has no label files, so `n_hand_boxes: null` there means unlabeled, not hand-free.
 - Zenodo has almost no negative frames: 36 hand-free in Train/Val/Test (34 / 1 / 1). F1 negatives have to come from elsewhere (Voxel51, own clips).
-- The full Zenodo download took 108 min at 5.9 MiB/s with 8 workers, plus 10 min of extraction (40.7 GiB on disk). The parts (38.6 GiB) were deleted on Oct 31 after a full re-verification with `zenodo_cleanup.py` (`--delete-parts` needs ~81 GiB free to run, see LOG.md).
+- The full Zenodo download took 108 min at 5.9 MiB/s with 8 workers, plus 10 min of extraction (40.7 GiB on disk). The parts (38.6 GiB) were deleted on Oct 31 after a full re-verification with `zenodo_cleanup.py` (`--delete-parts` needs ~81 GiB free to run).
 - Windows paths: the deepest path is 212 characters. If a deeper data dir is used, use `--data-dir D:\sl-data` or enable long paths.

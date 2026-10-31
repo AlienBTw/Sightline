@@ -8,6 +8,16 @@
 # Local progress trackers (not for GitHub)
 progress/
 
+# Personal progress notes (local only; README.md files stay tracked)
+JOURNAL.md
+**/JOURNAL.md
+LOG.md
+**/LOG.md
+REPORT_NOTES.md
+**/REPORT_NOTES.md
+SPLITS.md
+**/SPLITS.md
+
 # Python
 .venv/
 venv/
