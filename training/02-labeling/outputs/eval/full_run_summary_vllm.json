@@ -1,0 +1,318 @@
+{
+ "rows": 658,
+ "unique_clips": 658,
+ "duplicate_clip_ids": [],
+ "valid_rows": 658,
+ "malformed": [],
+ "frames": 2632,
+ "splits": {
+  "test": 117,
+  "train": 541
+ },
+ "sources": {
+  "voxel51_safe_unsafe": 658
+ },
+ "models": {
+  "muse-glimmer-30b-int4-vllm": 658
+ },
+ "prompts": {
+  "v2-7238ea9f": 658
+ },
+ "reasoning": {
+  "none": 658
+ },
+ "merged_duplicate_groups": 32,
+ "clip_level": {
+  "F1": {
+   "present": 29,
+   "absent": 620,
+   "uncertain": 9
+  },
+  "F2": {
+   "present": 528,
+   "absent": 3,
+   "uncertain": 127
+  },
+  "F3": {
+   "present": 7,
+   "absent": 2,
+   "uncertain": 649
+  },
+  "F4": {
+   "present": 0,
+   "absent": 4,
+   "uncertain": 654
+  },
+  "F5": {
+   "present": 513,
+   "absent": 25,
+   "uncertain": 120
+  },
+  "F6": {
+   "present": 9,
+   "absent": 649,
+   "uncertain": 0
+  },
+  "F7": {
+   "present": 26,
+   "absent": 632,
+   "uncertain": 0
+  },
+  "F8": {
+   "present": 629,
+   "absent": 28,
+   "uncertain": 1
+  },
+  "F9": {
+   "present": 120,
+   "absent": 520,
+   "uncertain": 18
+  },
+  "F10": {
+   "present": 9,
+   "absent": 649,
+   "uncertain": 0
+  }
+ },
+ "frame_level": {
+  "F1": {
+   "present": 44,
+   "absent": 2574,
+   "uncertain": 14
+  },
+  "F2": {
+   "present": 1772,
+   "absent": 155,
+   "uncertain": 705
+  },
+  "F3": {
+   "present": 8,
+   "absent": 102,
+   "uncertain": 2522
+  },
+  "F4": {
+   "present": 0,
+   "absent": 184,
+   "uncertain": 2448
+  },
+  "F5": {
+   "present": 1648,
+   "absent": 311,
+   "uncertain": 673
+  },
+  "F6": {
+   "present": 10,
+   "absent": 2622,
+   "uncertain": 0
+  },
+  "F7": {
+   "present": 43,
+   "absent": 2589,
+   "uncertain": 0
+  },
+  "F8": {
+   "present": 2154,
+   "absent": 448,
+   "uncertain": 30
+  },
+  "F9": {
+   "present": 252,
+   "absent": 2348,
+   "uncertain": 32
+  },
+  "F10": {
+   "present": 10,
+   "absent": 2622,
+   "uncertain": 0
+  }
+ },
+ "uncertain_rate_all": 0.24,
+ "present_rate_all": 0.284,
+ "agreement": {
+  "F7": {
+   "hint_present": 56,
+   "hint_absent": 30,
+   "confusion": {
+    "present": {
+     "present": 23,
+     "absent": 33,
+     "uncertain": 0
+    },
+    "absent": {
+     "present": 3,
+     "absent": 27,
+     "uncertain": 0
+    }
+   },
+   "tp": 23,
+   "fp": 3,
+   "fn": 33,
+   "tn": 27,
+   "uncertain": 0,
+   "precision": 0.885,
+   "recall": 0.411,
+   "specificity": 0.9,
+   "uncertain_rate": 0.0,
+   "agree_when_decided": 0.581
+  },
+  "F8": {
+   "hint_present": 210,
+   "hint_absent": 72,
+   "confusion": {
+    "present": {
+     "present": 194,
+     "absent": 15,
+     "uncertain": 1
+    },
+    "absent": {
+     "present": 71,
+     "absent": 1,
+     "uncertain": 0
+    }
+   },
+   "tp": 194,
+   "fp": 71,
+   "fn": 16,
+   "tn": 1,
+   "uncertain": 1,
+   "precision": 0.732,
+   "recall": 0.924,
+   "specificity": 0.014,
+   "uncertain_rate": 0.004,
+   "agree_when_decided": 0.694
+  },
+  "F9": {
+   "hint_present": 142,
+   "hint_absent": 32,
+   "confusion": {
+    "present": {
+     "present": 49,
+     "absent": 82,
+     "uncertain": 11
+    },
+    "absent": {
+     "present": 0,
+     "absent": 31,
+     "uncertain": 1
+    }
+   },
+   "tp": 49,
+   "fp": 0,
+   "fn": 93,
+   "tn": 31,
+   "uncertain": 12,
+   "precision": 1.0,
+   "recall": 0.345,
+   "specificity": 0.969,
+   "uncertain_rate": 0.069,
+   "agree_when_decided": 0.494
+  }
+ },
+ "present_by_class": {
+  "Safe Walkway Violation": {
+   "_clips": 210,
+   "F1": 2,
+   "F2": 165,
+   "F3": 0,
+   "F4": 0,
+   "F5": 166,
+   "F6": 3,
+   "F7": 0,
+   "F8": 194,
+   "F9": 9,
+   "F10": 6
+  },
+  "Opened Panel Cover": {
+   "_clips": 141,
+   "F1": 21,
+   "F2": 138,
+   "F3": 4,
+   "F4": 0,
+   "F5": 126,
+   "F6": 4,
+   "F7": 0,
+   "F8": 137,
+   "F9": 49,
+   "F10": 0
+  },
+  "Unauthorized Intervention": {
+   "_clips": 81,
+   "F1": 3,
+   "F2": 72,
+   "F3": 1,
+   "F4": 0,
+   "F5": 72,
+   "F6": 0,
+   "F7": 0,
+   "F8": 78,
+   "F9": 28,
+   "F10": 1
+  },
+  "Safe Walkway": {
+   "_clips": 72,
+   "F1": 1,
+   "F2": 66,
+   "F3": 2,
+   "F4": 0,
+   "F5": 67,
+   "F6": 0,
+   "F7": 0,
+   "F8": 71,
+   "F9": 13,
+   "F10": 2
+  },
+  "Carrying Overload with Forklift": {
+   "_clips": 56,
+   "F1": 0,
+   "F2": 20,
+   "F3": 0,
+   "F4": 0,
+   "F5": 23,
+   "F6": 0,
+   "F7": 23,
+   "F8": 53,
+   "F9": 0,
+   "F10": 0
+  },
+  "Authorized Intervention": {
+   "_clips": 37,
+   "F1": 2,
+   "F2": 34,
+   "F3": 0,
+   "F4": 0,
+   "F5": 27,
+   "F6": 1,
+   "F7": 0,
+   "F8": 36,
+   "F9": 21,
+   "F10": 0
+  },
+  "Closed Panel Cover": {
+   "_clips": 31,
+   "F1": 0,
+   "F2": 29,
+   "F3": 0,
+   "F4": 0,
+   "F5": 28,
+   "F6": 1,
+   "F7": 0,
+   "F8": 31,
+   "F9": 0,
+   "F10": 0
+  },
+  "Safe Carrying": {
+   "_clips": 30,
+   "F1": 0,
+   "F2": 4,
+   "F3": 0,
+   "F4": 0,
+   "F5": 4,
+   "F6": 0,
+   "F7": 3,
+   "F8": 29,
+   "F9": 0,
+   "F10": 0
+  }
+ },
+ "labels_file": "weak_labels_v2_vllm.jsonl"
+}

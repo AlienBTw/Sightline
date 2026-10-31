@@ -1,0 +1,92 @@
+# Sightline hazard factors (single source of truth for training).
+# Used by: 02-labeling (prompt + schema), 04-head (output order), 05-eval, 06-localization.
+# Order matters: the head's factor logits follow this list.
+version: 1
+factors:
+  - id: F1
+    name: hand_in_danger_zone
+    description: A person's hand or arm is inside or reaching into a machine's danger zone (blade, rotating part, press, pinch point).
+    labeled_by: [glimmer, zenodo_tablesaw_boxes]
+    supervision: mil          # clip-level weak label -> multiple-instance learning over patches/frames
+    temporal: false
+  - id: F2
+    name: no_head_protection
+    description: A person in an area where head protection is required is not wearing a hard hat or bump cap.
+    labeled_by: [glimmer]
+    supervision: mil
+    temporal: false
+  - id: F3
+    name: no_eye_face_protection
+    description: A person operating or standing close to a machine, grinder, saw or welding work is not wearing safety glasses, goggles or a face shield.
+    labeled_by: [glimmer]
+    supervision: mil
+    temporal: false
+  - id: F4
+    name: wrong_glove_state
+    description: Glove state is wrong for the task near machinery - gloves worn near rotating/entangling parts, or no gloves when handling sharp or hot material.
+    labeled_by: [glimmer]
+    supervision: mil
+    temporal: false
+  - id: F5
+    name: no_hi_vis
+    description: A person in an area with vehicle or forklift traffic is not wearing a high-visibility vest or clothing.
+    labeled_by: [glimmer]
+    supervision: mil
+    temporal: false
+  - id: F6
+    name: fall_or_slip
+    description: A person is falling, slipping, tripping, or lying on the floor.
+    labeled_by: [glimmer]
+    supervision: mil
+    temporal: true            # motion factor - single keyframes are weak evidence
+  - id: F7
+    name: unstable_or_falling_load
+    description: A carried, lifted or stacked load is unstable, overloaded, tilting, or falling (forklift, crane, shelf, pallet).
+    labeled_by: [glimmer, voxel51_class_hint]
+    supervision: mil
+    temporal: true
+  - id: F8
+    name: person_in_vehicle_path
+    description: A person is outside the marked pedestrian walkway or in the path of a forklift or other vehicle.
+    labeled_by: [glimmer, voxel51_class_hint]
+    supervision: mil
+    temporal: false
+  - id: F9
+    name: open_guard_or_panel
+    description: A machine guard, electrical panel cover or cabinet door is open or removed.
+    labeled_by: [glimmer, voxel51_class_hint]
+    supervision: mil
+    temporal: false
+  - id: F10
+    name: fire_smoke_sparks
+    description: Visible fire, flames, smoke, or a spark shower.
+    labeled_by: [glimmer]
+    supervision: mil
+    temporal: false
+  - id: F11
+    name: abnormal_machine_behaviour
+    description: A machine behaves abnormally (unexpected motion, vibration, jam). Not labeled by Glimmer - scored from V-JEPA 2.1 prediction error.
+    labeled_by: [anomaly]
+    supervision: anomaly
+    temporal: true
+
+# Factors the Glimmer labeler is asked about (F11 is excluded on purpose).
+glimmer_factors: [F1, F2, F3, F4, F5, F6, F7, F8, F9, F10]
+
+# Dataset class -> factor hints. Hints are NOT ground truth for every factor;
+# they only say something about the listed factor. Everything else is left to Glimmer.
+# Voxel51 Safe_and_Unsafe_Behaviours classes (from its samples.json, checked 2026-10-30):
+dataset_hints:
+  voxel51_safe_unsafe:
+    "Safe Walkway Violation": {F8: present}
+    "Safe Walkway": {F8: absent}
+    "Opened Panel Cover": {F9: present}
+    "Closed Panel Cover": {F9: absent}
+    "Carrying Overload with Forklift": {F7: present}   # proxy: overload (3+ blocks) treated as unstable load
+    "Safe Carrying": {F7: absent}
+    "Unauthorized Intervention": {}   # 'intervenes without proper gear/authorization' - no single factor, left to Glimmer
+    "Authorized Intervention": {}
+
+# Risk score (04-head): weights are learned; this is only the prior used before training.
+risk_prior:
+  aggregation: noisy_or

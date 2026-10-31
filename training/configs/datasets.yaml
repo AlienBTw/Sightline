@@ -1,0 +1,39 @@
+# Datasets used for training. Only permissive licences (CC BY 4.0 / CC0 / MIT / Apache-2.0).
+# Not allowed (non-commercial or no licence): SH17, iSafetyBench, IPAD.
+version: 1
+datasets:
+  voxel51_safe_unsafe:
+    enabled: true
+    kind: video
+    provider: huggingface
+    repo_id: Voxel51/Safe_and_Unsafe_Behaviours
+    revision: 7369ff1830b5f6c00f7d7383eeeaa90704bfc5b5   # commit checked 2026-10-30
+    url: https://huggingface.co/datasets/Voxel51/Safe_and_Unsafe_Behaviours
+    license: CC-BY-4.0
+    attribution: "Önal, O., & Dandıl, E. (2024). Video dataset for the detection of safe and unsafe behaviours in workplaces. Data in Brief, 56, 110756. https://doi.org/10.1016/j.dib.2024.110756 (FiftyOne export by Voxel51)"
+    expected_clips: 691          # 566 train + 125 test, ~10.0 GB
+    checksum: sha256 (git-lfs oid from the HF tree API)
+  zenodo_tablesaw:
+    enabled: true
+    kind: image
+    provider: zenodo
+    record_id: 18936355
+    url: https://doi.org/10.5281/zenodo.18936355
+    license: CC-BY-4.0
+    attribution: "Steckhan, N., Prajapati, K., Shao, W., Heinle, J., Vock, S. (2026). Dataset for Hand Detection Near a Sliding Table Saw in Safety-Critical Woodworking Scenarios. Fraunhofer IPA. Zenodo. https://doi.org/10.5281/zenodo.18936355"
+    expected_images: 12183       # manually verified subset per the record description; YOLO 1.1 boxes, class Hand
+    archive: "data.tar.gz split into 39 parts (part-aa .. part-bm), ~38.6 GiB total"
+    checksum: md5 per part (Zenodo API)
+  # --- placeholders: licences still to be confirmed before use ---
+  ppe_tbd:
+    enabled: false
+    kind: image
+    note: "PPE set for F2/F3/F5 - candidates Kaggle Hard Hat (CC0, to confirm), SHWD (licence to confirm). Not downloaded."
+  fire_tbd:
+    enabled: false
+    kind: image
+    note: "Fire/smoke set for F10 - D-Fire licence unknown, not usable until confirmed. Not downloaded."
+  own_staged_clips:
+    enabled: false
+    kind: video
+    note: "Alien's own safely staged workshop clips (props only). Licence: own work. Not recorded yet."

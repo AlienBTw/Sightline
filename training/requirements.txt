@@ -1,0 +1,10 @@
+# Training-pipeline extras (phases 01-02). The repo's pyproject.toml already
+# covers numpy, opencv-python-headless and PyYAML; listed again so this file
+# works on its own: pip install -r training/requirements.txt
+numpy>=1.26
+opencv-python-headless>=4.8
+PyYAML>=6.0
+pytest>=8.0
+# Later phases (03-features / 04-head) - V-JEPA 2.1 needs PyTorch with CUDA:
+# torch>=2.2  (install the CUDA build from pytorch.org, not from PyPI defaults)
+# timm, einops  (vjepa2 repo dependencies - confirm against its requirements.txt in 03-features)

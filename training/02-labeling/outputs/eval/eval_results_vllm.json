@@ -1,0 +1,65 @@
+{
+ "created": "2026-10-31T13:20:22+01:00",
+ "model": "muse-glimmer-30b-int4-vllm",
+ "backend": "vllm",
+ "base_url": "http://localhost:30001/v1",
+ "concurrency": 16,
+ "keyframes": 4,
+ "max_side": 768,
+ "eval_set": "eval_set.json",
+ "configs": {
+  "v2:none": {
+   "clips": 23,
+   "missing": [],
+   "per_factor": {
+    "F7": {
+     "n": 7,
+     "tp": 3,
+     "fp": 0,
+     "fn": 1,
+     "tn": 3,
+     "uncertain": 0,
+     "precision": 1.0,
+     "recall": 0.75,
+     "uncertain_rate": 0.0
+    },
+    "F8": {
+     "n": 9,
+     "tp": 4,
+     "fp": 4,
+     "fn": 1,
+     "tn": 0,
+     "uncertain": 0,
+     "precision": 0.5,
+     "recall": 0.8,
+     "uncertain_rate": 0.0
+    },
+    "F9": {
+     "n": 7,
+     "tp": 1,
+     "fp": 0,
+     "fn": 3,
+     "tn": 3,
+     "uncertain": 0,
+     "precision": 1.0,
+     "recall": 0.25,
+     "uncertain_rate": 0.0
+    }
+   },
+   "uncertain_rate_all_factors": 0.283,
+   "present_rate_all_factors": 0.23,
+   "calls_timed": 92,
+   "sec_per_call_mean": 54.54,
+   "sec_per_call_median": 61.94,
+   "prompt_id": "v2-7238ea9f",
+   "run": {
+    "calls": 92,
+    "wall_s": 418.6,
+    "concurrency": 16,
+    "backend": "vllm",
+    "model": "muse-glimmer-30b-int4-vllm"
+   },
+   "calls_per_min": 13.2
+  }
+ }
+}

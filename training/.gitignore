@@ -1,0 +1,49 @@
+# Everything heavy or regenerable stays out of git. Docs, configs, scripts,
+# LOG.md files and small result files (metrics, weak labels) are committed.
+
+# Datasets, caches and run logs
+data/
+cache/
+runs/
+logs/
+*.log
+
+# Model weights and checkpoints
+weights/
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.safetensors
+*.gguf
+*.onnx
+*.joblib
+
+# 03-features outputs (V-JEPA features) and other bulk arrays
+features/
+03-features/outputs/
+*.npy
+*.npz
+*.h5
+*.hdf5
+*.parquet
+
+# Media (frames, previews, clips)
+*.mp4
+*.avi
+*.mov
+*.mkv
+**/outputs/**/*.png
+**/outputs/**/*.jpg
+**/outputs/**/*.jpeg
+
+# Partial downloads / temp
+*.part
+*.tmp
+
+# Error dumps from labeling runs (can contain raw model replies; regenerate)
+*.errors.jsonl
+
+__pycache__/
+.pytest_cache/

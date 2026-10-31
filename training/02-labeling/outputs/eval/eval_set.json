@@ -1,0 +1,197 @@
+{
+ "created": "2026-10-30T23:35:57+01:00",
+ "buckets": {
+  "F8=present": 5,
+  "F8=absent": 4,
+  "F9=present": 4,
+  "F9=absent": 3,
+  "F7=present": 4,
+  "F7=absent": 3
+ },
+ "clips": [
+  {
+   "id": "voxel51/0_tr82",
+   "split": "train",
+   "source_label": "Safe Walkway Violation",
+   "factor_hints": {
+    "F8": "present"
+   }
+  },
+  {
+   "id": "voxel51/0_tr20",
+   "split": "train",
+   "source_label": "Safe Walkway Violation",
+   "factor_hints": {
+    "F8": "present"
+   }
+  },
+  {
+   "id": "voxel51/0_tr159",
+   "split": "train",
+   "source_label": "Safe Walkway Violation",
+   "factor_hints": {
+    "F8": "present"
+   }
+  },
+  {
+   "id": "voxel51/0_tr78",
+   "split": "train",
+   "source_label": "Safe Walkway Violation",
+   "factor_hints": {
+    "F8": "present"
+   }
+  },
+  {
+   "id": "voxel51/0_te12",
+   "split": "test",
+   "source_label": "Safe Walkway Violation",
+   "factor_hints": {
+    "F8": "present"
+   }
+  },
+  {
+   "id": "voxel51/4_te10",
+   "split": "test",
+   "source_label": "Safe Walkway",
+   "factor_hints": {
+    "F8": "absent"
+   }
+  },
+  {
+   "id": "voxel51/4_tr21",
+   "split": "train",
+   "source_label": "Safe Walkway",
+   "factor_hints": {
+    "F8": "absent"
+   }
+  },
+  {
+   "id": "voxel51/4_tr37",
+   "split": "train",
+   "source_label": "Safe Walkway",
+   "factor_hints": {
+    "F8": "absent"
+   }
+  },
+  {
+   "id": "voxel51/4_te13",
+   "split": "test",
+   "source_label": "Safe Walkway",
+   "factor_hints": {
+    "F8": "absent"
+   }
+  },
+  {
+   "id": "voxel51/2_tr75",
+   "split": "train",
+   "source_label": "Opened Panel Cover",
+   "factor_hints": {
+    "F9": "present"
+   }
+  },
+  {
+   "id": "voxel51/2_tr6",
+   "split": "train",
+   "source_label": "Opened Panel Cover",
+   "factor_hints": {
+    "F9": "present"
+   }
+  },
+  {
+   "id": "voxel51/2_te1",
+   "split": "test",
+   "source_label": "Opened Panel Cover",
+   "factor_hints": {
+    "F9": "present"
+   }
+  },
+  {
+   "id": "voxel51/2_te12",
+   "split": "test",
+   "source_label": "Opened Panel Cover",
+   "factor_hints": {
+    "F9": "present"
+   }
+  },
+  {
+   "id": "voxel51/6_tr4",
+   "split": "train",
+   "source_label": "Closed Panel Cover",
+   "factor_hints": {
+    "F9": "absent"
+   }
+  },
+  {
+   "id": "voxel51/6_te4",
+   "split": "test",
+   "source_label": "Closed Panel Cover",
+   "factor_hints": {
+    "F9": "absent"
+   }
+  },
+  {
+   "id": "voxel51/6_tr9",
+   "split": "train",
+   "source_label": "Closed Panel Cover",
+   "factor_hints": {
+    "F9": "absent"
+   }
+  },
+  {
+   "id": "voxel51/3_tr36",
+   "split": "train",
+   "source_label": "Carrying Overload with Forklift",
+   "factor_hints": {
+    "F7": "present"
+   }
+  },
+  {
+   "id": "voxel51/3_tr37",
+   "split": "train",
+   "source_label": "Carrying Overload with Forklift",
+   "factor_hints": {
+    "F7": "present"
+   }
+  },
+  {
+   "id": "voxel51/3_tr15",
+   "split": "train",
+   "source_label": "Carrying Overload with Forklift",
+   "factor_hints": {
+    "F7": "present"
+   }
+  },
+  {
+   "id": "voxel51/3_tr35",
+   "split": "train",
+   "source_label": "Carrying Overload with Forklift",
+   "factor_hints": {
+    "F7": "present"
+   }
+  },
+  {
+   "id": "voxel51/7_tr9",
+   "split": "train",
+   "source_label": "Safe Carrying",
+   "factor_hints": {
+    "F7": "absent"
+   }
+  },
+  {
+   "id": "voxel51/7_tr17",
+   "split": "train",
+   "source_label": "Safe Carrying",
+   "factor_hints": {
+    "F7": "absent"
+   }
+  },
+  {
+   "id": "voxel51/7_tr22",
+   "split": "train",
+   "source_label": "Safe Carrying",
+   "factor_hints": {
+    "F7": "absent"
+   }
+  }
+ ]
+}
