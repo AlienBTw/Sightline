@@ -8,7 +8,8 @@
 |---|---|---|---|---|
 | [Voxel51/Safe_and_Unsafe_Behaviours](https://huggingface.co/datasets/Voxel51/Safe_and_Unsafe_Behaviours), pinned at commit `7369ff18` | 691 MP4 clips (566 train / 125 test), 1920×1080, about 24 fps, 1–20 s, 8 classes | about 9.3 GiB (10.0 GB) | CC BY 4.0 | sha256 (git-lfs oid) per clip |
 | [Zenodo 18936355](https://doi.org/10.5281/zenodo.18936355), Fraunhofer IPA | Table-saw images with YOLO 1.1 `Hand` boxes. The record says 12,183 verified images (6,507 / 2,085 / 3,591), split by person | 39 parts, `data.tar.gz.part-aa` … `part-bm`, about 38.6 GiB | CC BY 4.0 | md5 per part |
-| PPE set (F2/F3/F5) | still to be chosen (Kaggle Hard Hat CC0? SHWD?) | | must be confirmed first | |
+| PPE stills (F2) | [SHWD](https://github.com/njvisionpower/Safety-Helmet-Wearing-Dataset) (Safety-Helmet-Wearing-Dataset), Pascal VOC bare-head (`person`) and helmet (`hat`) boxes; manifest from `build_shwd_manifest.py` | 7,581 images | MIT | |
+| PPE video (F2/F5) | Pexels clips labelled by Muse Spark 1.3 Contributor, see [`08-video-ppe`](../08-video-ppe/README.md) | 87 clips | Pexels License | |
 | Fire/smoke set (F10) | still to be chosen (D-Fire licence unknown, so not usable yet) | | must be confirmed first | |
 | Own staged clips | not recorded yet | | own work | |
 

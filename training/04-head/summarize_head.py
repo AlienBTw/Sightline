@@ -63,6 +63,43 @@ def main(results_dir=HERE / "results"):
         f1 = r["test"].get("F1", {})
         lines.append(f"| {n} | {fmt(pz.get('auroc'))} | {fmt(pz.get('ap'))} | {fmt(f1.get('f1')) if z else '-'} |")
     lines.append("")
+    shwd_rows = [(n, r["shwd"]) for n, r in single if r.get("shwd")]
+    if shwd_rows:
+        lines += ["### SHWD: F2 patch map vs bare-head boxes", "",
+                  "| run | val patch AUROC | val patch AP | test patch AUROC | test patch AP |",
+                  "|---|---|---|---|---|"]
+        for n, block in shwd_rows:
+            v = (block.get("validation") or {}).get("F2_patch_vs_boxes") or {}
+            t = (block.get("test") or {}).get("F2_patch_vs_boxes") or {}
+            lines.append(
+                f"| {n} | {fmt(v.get('auroc'))} | {fmt(v.get('ap'))} | {fmt(t.get('auroc'))} | {fmt(t.get('ap'))} |"
+            )
+        lines.append("")
+    ppe_rows = [(n, r["ppe"]) for n, r in single if isinstance(r.get("ppe"), dict)]
+    if ppe_rows:
+        lines += ["### PPE video: F2/F5 on the real-video test split", "",
+                  "Clip score is the MIL probability. Window score is the max patch evidence in that window.",
+                  "",
+                  "| run | F2 clip AUROC / AP (pos/n) | F5 clip AUROC / AP (pos/n) | F2 window | F5 window | F2 patch AUROC | F5 patch AUROC |",
+                  "|---|---|---|---|---|---|---|"]
+        for n, block in ppe_rows:
+            clip = (block.get("clip") or {}).get("all") or {}
+            win = (block.get("window") or {}).get("all") or {}
+            patch = block.get("patch") or {}
+
+            def cell(d):
+                if not isinstance(d, dict) or not d.get("n"):
+                    return "-"
+                if "auroc" in d:
+                    return f"{d['auroc']:.2f} / {d['ap']:.2f} ({d.get('pos')}/{d.get('n')})"
+                return f"one class ({d.get('pos')}/{d.get('n')})"
+
+            lines.append(
+                f"| {n} | {cell(clip.get('F2'))} | {cell(clip.get('F5'))} | {cell(win.get('F2'))} | "
+                f"{cell(win.get('F5'))} | {fmt((patch.get('F2') or {}).get('auroc'))} | "
+                f"{fmt((patch.get('F5') or {}).get('auroc'))} |"
+            )
+        lines.append("")
     cv = defaultdict(list)
     for n, r in runs.items():
         m = re.match(r"(.+_cv\d+)_f\d+$", n)

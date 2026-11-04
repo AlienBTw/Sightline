@@ -1,4 +1,4 @@
-# 04 – Head (concept-bottleneck training)
+# 04 â€“ Head (concept-bottleneck training)
 
 **Goal:** a small head on frozen V-JEPA 2.1 features that predicts the hazard factors (F1-F10) as named concepts, each with its own spatial map, so every alert is explained by factors and can be circled in the frame. The risk score (noisy-OR prior in `configs/factors.yaml`) and F11 (anomaly from V-JEPA prediction error) come later.
 
@@ -48,7 +48,7 @@ Voxel51 official test (117 unique clips), AUROC / AP (positives/labeled):
 
 h3_wide at the validation-chosen thresholds on the test split: F8 F1 0.86 (P 0.85 / R 0.88), F9 0.72 (P 0.57 / R 1.00), F7 1.00, F5 0.94.
 
-**5-fold out-of-fold over all 658 unique clips (h1_base)** – the more reliable numbers, since the official test has only 1 positive for F1/F6/F10:
+**5-fold out-of-fold over all 658 unique clips (h1_base)** â€“ the more reliable numbers, since the official test has only 1 positive for F1/F6/F10:
 
 | F1 | F2 | F5 | F6 | F7 | F8 | F9 | F10 |
 |---|---|---|---|---|---|---|---|
@@ -60,7 +60,7 @@ h3_wide at the validation-chosen thresholds on the test split: F8 F1 0.86 (P 0.8
 - **F7/F8/F9 (dataset labels) are learned well**: F7 is perfectly separable (overloaded vs safe forklift clips), F8 ~0.87-0.90 AUROC, F9 ~0.86-0.96.
 - **F1 localization works on the table-saw domain**: the F1 patch map matches hand boxes at 0.99 patch AUROC / 0.94 AP on 3,591 held-out images. Without the patch loss (h4) the map is near chance (0.56), so the box supervision is what makes circling possible.
 - Adding Zenodo costs a little on Voxel51 F1-F10 test numbers (h2 vs h1), but h2 has no localization for F1. h3_wide recovers most of the gap on the official test -> **h3_wide is the current pick**, with h1_base as an equal alternative per CV.
-- **F2 cannot be evaluated**: every labeled test clip is "present" (528/531 overall). Combined with the ~80% present rate this looks like Glimmer bias or a dataset without helmets; needs the spot-check / a PPE dataset.
+- **F2 cannot be evaluated**: every labeled test clip is "present" (528/531 overall). Combined with the ~80% present rate this looks like Glimmer bias or a dataset without helmets; needs the spot-check / a PPE dataset. Nov 4 follow-ups: SHWD bare-head boxes (patch AUROC 0.984-0.990 on the held-out SHWD test split, no transfer to video) and heads retrained on Muse-labelled video (they learned the video source, see [`08-video-ppe`](../08-video-ppe/README.md) and [`results/PPE_SHORTCUT.md`](results/PPE_SHORTCUT.md)). h3_wide stays live; F2/F5 are decided by the Muse Spark verify gates in `sightline_pipeline`.
 - F6/F10 (9 positives each) and Voxel51 F1 (29) are too sparse for trustworthy numbers; F3/F4 are not trained.
 - Zenodo F1 image-level metrics are meaningless (3,590 of 3,591 test images contain hands), so F1 is reported per source; mixed-source F1 AUROC would just measure domain.
 
