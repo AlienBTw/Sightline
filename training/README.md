@@ -27,9 +27,11 @@ All training code in this folder was written during the event. The pre-event cod
 | 02 | [`02-labeling`](02-labeling/) | Muse Glimmer 30B weak labels for F1-F10 | Oct 31: v1/v2 x reasoning none/low eval (368 calls), v2/none chosen. Backends: Ollama 5.4, SGLang 8.6, vLLM INT4 21.6 calls/min. **Full run done 13:38-16:14 on vLLM: 658/658 clips, 2,632 frames, 0 errors.** F7/F8/F9 from dataset hints |
 | 03 | [`03-features`](03-features/) | V-JEPA 2.1 ViT-L feature extraction (384x672, 16-frame windows) | Done Oct 31: 658 clips + 12,183 images, 0 errors, 13.7 min |
 | 04 | [`04-head`](04-head/) | Concept-bottleneck head (MIL for clip-level factors, anomaly for F11) | First version done Oct 31 (h3_wide); F11 not yet |
-| 05 | [`05-eval`](05-eval/) | Evaluation and the Glimmer label spot-check | Not started |
-| 06 | [`06-localization`](06-localization/) | Patch activations to a circle around the flagged area | Not started |
+| 05 | [`05-eval`](05-eval/) | Evaluation and the Glimmer label spot-check | Oct 31: circle quality on Zenodo test measured (see 06); label spot-check dropped (no more data work) |
+| 06 | [`06-localization`](06-localization/) | Patch activations to a circle around the flagged area | Done Oct 31 in the live pipeline [`sightline_pipeline/`](../sightline_pipeline/): F1 circle centre inside a hand box on 93.7% of 3,590 Zenodo test images |
 | 07 | [`07-export`](07-export/) | Export weights/config for the backend and the mobile app | Not started |
+
+Live inference (ingest, sliding windows, events, circles, SAM 3.1 / Muse Spark escalation, clips) is in the top-level package [`sightline_pipeline/`](../sightline_pipeline/README.md), which reuses `03-features` and `04-head` code.
 
 ## Quick start (Windows PowerShell, from the repo root)
 

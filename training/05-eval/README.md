@@ -9,4 +9,6 @@
 - F1 localization against the Zenodo hand boxes (from 06)
 
 ## Results
-Not run yet.
+- F1 localization against the Zenodo hand boxes: done, see [`06-localization`](../06-localization/README.md).
+- Per-factor test and cross-validation metrics are in [`04-head`](../04-head/README.md).
+- The human spot-check of Glimmer labels and an out-of-distribution test set are future work, since no new data work happens during the event.

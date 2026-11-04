@@ -11,8 +11,13 @@ Labels:
   Voxel51 (658 unique clips; duplicate files were merged in 02-labeling, so no clip is in both splits)
     F1, F2, F5, F6, F10 : Glimmer clip label (present=1, absent=0, uncertain=ignored)
     F3, F4              : ignored by default (~99% uncertain)
-    F7, F8, F9          : dataset class hint where the class defines it, else ignored
-  Zenodo table saw (images): F1 = hand box present; other factors ignored.
+    F7, F8, F9          : dataset class hint where the class defines it;
+                            every other clip is an explicit negative (not ignored)
+  Zenodo table saw (images): F1 = hand box present; F6-F10 explicit negatives
+                            (a saw frame is not a fall, a load, a vehicle path,
+                            an open guard, or fire). F2-F5 stay ignored.
+                            --zenodo-f9-frac can drop F9 on train rows so easy saw
+                            frames do not drown the closed-panel contrast.
     Hand boxes also give a patch-level F1 target (aux loss on s_F1).
 
 Subcommands:
@@ -47,8 +52,13 @@ def voxel_targets(row: dict, ignore=DEFAULT_IGNORE):
             continue
         if f in HINT_FACTORS:
             lab = (row.get("factor_hints") or {}).get(f)
-        else:
-            lab = (row.get("factors") or {}).get(f, {}).get("label")
+            if lab == "present":
+                y[i], m[i] = 1.0, 1.0
+            else:
+                # absent, or no hint: this scene is not that hazard
+                m[i] = 1.0
+            continue
+        lab = (row.get("factors") or {}).get(f, {}).get("label")
         if lab == "present":
             y[i], m[i] = 1.0, 1.0
         elif lab == "absent":
@@ -56,10 +66,16 @@ def voxel_targets(row: dict, ignore=DEFAULT_IGNORE):
     return y, m
 
 
+# A table-saw frame cannot be a fall, an unstable load, a vehicle path, an open guard, or fire.
+ZENODO_NEGATIVE = ("F6", "F7", "F8", "F9", "F10")
+
+
 def zenodo_targets(n_boxes: int):
     y, m = [0.0] * 10, [0.0] * 10
     m[0] = 1.0
     y[0] = 1.0 if n_boxes > 0 else 0.0
+    for f in ZENODO_NEGATIVE:
+        m[FACTORS.index(f)] = 1.0
     return y, m
 
 
@@ -116,6 +132,68 @@ def assign_split(item: dict, val_frac: float, seed: int, cv: int = 0, fold: int 
     return "val" if h < val_frac else "train"
 
 
+CLOSED_PANEL_LABEL = "Closed Panel Cover"
+HARD_NEG_BOOST = 5.0
+
+
+def zenodo_f9_keep(row_id: str, frac: float, seed: int = 0) -> bool:
+    """Whether this Zenodo training row still supervises F9. 1 keeps all, 0 keeps none."""
+    if frac >= 1:
+        return True
+    if frac <= 0:
+        return False
+    import hashlib
+    h = int(hashlib.md5(f"f9:{seed}:{row_id}".encode()).hexdigest()[:8], 16) / 0xFFFFFFFF
+    return h < frac
+
+
+def mask_zenodo_f9(rows, frac: float, seed: int = 0) -> int:
+    """Clear F9 on Zenodo training rows outside the kept fraction. Val and test stay labeled."""
+    i = FACTORS.index("F9")
+    n = 0
+    for r in rows:
+        if r.get("source") != "zenodo" or r.get("set") != "train":
+            continue
+        if zenodo_f9_keep(r["id"], frac, seed):
+            continue
+        if r["m"][i]:
+            r["m"][i] = 0.0
+            n += 1
+    return n
+
+
+def sampling_weights(rows, src_w, scores_by_id=None, factor="F9", min_score=0.8, boost=HARD_NEG_BOOST):
+    """Source weights, with a boost for hard negatives of `factor` and for closed-panel clips.
+
+    A Voxel51 clip is boosted when it is labeled absent on `factor` and the reference
+    head scores it at least `min_score`, or when its dataset class is Closed Panel Cover.
+    """
+    i = FACTORS.index(factor)
+    out = []
+    for r in rows:
+        w = float(src_w[r["source"]])
+        if scores_by_id is not None and r.get("source") == "voxel51":
+            score = scores_by_id.get(r["id"])
+            labeled_neg = r["m"][i] > 0 and r["y"][i] <= 0.5
+            hard = labeled_neg and score is not None and score >= min_score
+            closed = (r.get("source_label") or "") == CLOSED_PANEL_LABEL
+            if hard or closed:
+                w *= boost
+        out.append(w)
+    return out
+
+
+def resolve_ckpt(path: str) -> Path:
+    p = Path(os.path.expanduser(path))
+    if p.is_file():
+        return p
+    for base in (TRAINING, TRAINING.parent, Path.cwd()):
+        cand = base / path
+        if cand.is_file():
+            return cand
+    raise SystemExit(f"hard-neg checkpoint not found: {path}")
+
+
 def pos_weights(ys, ms, cap: float = 20.0):
     """Per-factor neg/pos ratio over labeled entries, clamped to [1, cap]."""
     out = []
@@ -126,16 +204,39 @@ def pos_weights(ys, ms, cap: float = 20.0):
     return out
 
 
+def _counts(y, p, t):
+    tp = sum(1 for a, b in zip(y, p) if a > 0.5 and b >= t)
+    fp = sum(1 for a, b in zip(y, p) if a <= 0.5 and b >= t)
+    fn = sum(1 for a, b in zip(y, p) if a > 0.5 and b < t)
+    return tp, fp, fn
+
+
 def best_f1_threshold(y, p):
     best = (0.0, 0.5)
     for t in sorted(set(round(float(v), 4) for v in p)):
-        tp = sum(1 for a, b in zip(y, p) if a > 0.5 and b >= t)
-        fp = sum(1 for a, b in zip(y, p) if a <= 0.5 and b >= t)
-        fn = sum(1 for a, b in zip(y, p) if a > 0.5 and b < t)
+        tp, fp, fn = _counts(y, p, t)
         f1 = 2 * tp / (2 * tp + fp + fn) if tp else 0.0
         if f1 > best[0]:
             best = (f1, t)
     return best[1]
+
+
+def precision_threshold(y, p, floor=0.8):
+    """Highest-recall threshold whose precision is at least `floor`.
+
+    If none qualifies, the threshold with the highest precision (ties: higher cut).
+    """
+    best = None  # (recall, precision, t)
+    fallback = (-1.0, 0.5)
+    for t in sorted(set(round(float(v), 4) for v in p)):
+        tp, fp, fn = _counts(y, p, t)
+        prec = tp / (tp + fp) if tp + fp else 0.0
+        rec = tp / (tp + fn) if tp + fn else 0.0
+        if prec > fallback[0] or (prec == fallback[0] and t > fallback[1]):
+            fallback = (prec, t)
+        if tp and prec + 1e-9 >= floor and (best is None or rec > best[0] or (rec == best[0] and prec > best[1])):
+            best = (rec, prec, t)
+    return best[2] if best else fallback[1]
 
 
 # ---------------------------------------------------------------- cache
@@ -236,10 +337,19 @@ def cmd_train(a):
     labels = {r["clip_id"]: r for r in map(json.loads, open(TRAINING / a.labels, encoding="utf-8"))}
     for r in meta:
         if r["source"] == "voxel51":
-            r["y"], r["m"] = voxel_targets(labels[r["id"]], ignore=ignore)
+            lab = labels[r["id"]]
+            r["y"], r["m"] = voxel_targets(lab, ignore=ignore)
+            r["source_label"] = lab.get("source_label") or ""
+        elif r["source"] == "zenodo":
+            # Labels are stored in the feature cache; rebuild them so a label-policy
+            # change does not require rewriting the memmap.
+            r["y"], r["m"] = zenodo_targets(1 if r["y"][0] > 0.5 else 0)
         r["set"] = assign_split(r, a.val_frac, a.seed, a.cv, a.fold)
     if not a.use_zenodo:
         meta = [r for r in meta if r["source"] != "zenodo"]
+    if a.zenodo_f9_frac < 1:
+        cleared = mask_zenodo_f9(meta, a.zenodo_f9_frac, a.seed)
+        print(f"zenodo F9 mask cleared on {cleared} train rows (frac={a.zenodo_f9_frac})", flush=True)
     tr = [r for r in meta if r["set"] == "train"]
     va = [r for r in meta if r["set"] == "val"]
     te = [r for r in meta if r["set"] == "test"]
@@ -276,18 +386,39 @@ def cmd_train(a):
     nv = sum(1 for r in tr if r["source"] == "voxel51"); nz = len(tr) - nv
     if nz:
         src_w["zenodo"] = a.zenodo_share * nv / max(1, nz) / max(1e-6, 1 - a.zenodo_share)
-    weights = [src_w[r["source"]] for r in tr]
 
-    def predict(rs):
-        model.eval(); out, pmaps = [], []
+    def predict(rs, net=None):
+        net = model if net is None else net
+        net.eval(); out, pmaps = [], []
         with torch.no_grad():
             for i in range(0, len(rs), 32):
                 X, V, y, m, P = batchify(rs[i:i + 32], False)
-                z, s, w = model(X, V)
+                z, s, w = net(X, V)
                 out.append(torch.sigmoid(z).cpu())
                 pmaps.append(torch.sigmoid(s[..., 0]).cpu())   # F1 patch evidence
-        model.train()
+        net.train()
         return torch.cat(out).numpy(), pmaps
+
+    scores_by_id = None
+    if a.hard_neg_checkpoint:
+        if a.hard_neg_factor not in FACTORS:
+            raise SystemExit(f"unknown hard-neg factor {a.hard_neg_factor}")
+        ck_path = resolve_ckpt(a.hard_neg_checkpoint)
+        scorer = build_model(hidden=a.hidden, drop=a.dropout).to(dev)
+        blob = torch.load(ck_path, map_location=dev, weights_only=False)
+        scorer.load_state_dict(blob["state_dict"])
+        voxel_tr = [r for r in tr if r["source"] == "voxel51"]
+        pred, _ = predict(voxel_tr, scorer)
+        fi = FACTORS.index(a.hard_neg_factor)
+        scores_by_id = {r["id"]: float(pred[k, fi]) for k, r in enumerate(voxel_tr)}
+        del scorer
+        if dev.type == "cuda":
+            torch.cuda.empty_cache()
+        print(f"hard-neg scored {len(scores_by_id)} train clips from {ck_path.name}", flush=True)
+    weights = sampling_weights(tr, src_w, scores_by_id, a.hard_neg_factor, a.hard_neg_min)
+    if scores_by_id is not None:
+        n_boost = sum(1 for r, w in zip(tr, weights) if r["source"] == "voxel51" and w > src_w["voxel51"] * 1.01)
+        print(f"hard-neg boosted {n_boost} voxel train clips x{HARD_NEG_BOOST}", flush=True)
 
     def evaluate(rs):
         if not rs:
@@ -352,7 +483,12 @@ def cmd_train(a):
     for i, f in enumerate(FACTORS):
         yy = [r["y"][i] for r in va if r["m"][i]]
         pp = [float(vp[k, i]) for k, r in enumerate(va) if r["m"][i]]
-        thr[f] = best_f1_threshold(yy, pp) if len(set(yy)) == 2 else 0.5
+        if len(set(yy)) != 2:
+            thr[f] = 0.5
+        elif a.precision_floor > 0:
+            thr[f] = precision_threshold(yy, pp, a.precision_floor)
+        else:
+            thr[f] = best_f1_threshold(yy, pp)
     tres, tp = evaluate(te)
     for i, f in enumerate(FACTORS):
         yy = [r["y"][i] for r in te if r["m"][i]]
@@ -420,6 +556,14 @@ def main(argv=None):
     t.add_argument("--token-drop", type=float, default=0.1)
     t.add_argument("--patch-loss", type=float, default=0.5)
     t.add_argument("--patch-pw", type=float, default=5.0)
+    t.add_argument("--precision-floor", type=float, default=0.0,
+                   help="if > 0, pick val thresholds at this precision instead of best F1")
+    t.add_argument("--hard-neg-checkpoint", default="",
+                   help="score Voxel51 train clips with this head and upweight its misses")
+    t.add_argument("--hard-neg-factor", default="F9")
+    t.add_argument("--hard-neg-min", type=float, default=0.8)
+    t.add_argument("--zenodo-f9-frac", type=float, default=1.0,
+                   help="fraction of Zenodo train rows that still supervise F9 (0 = none)")
     a = ap.parse_args(argv)
     {"cache": cmd_cache, "train": cmd_train}[a.cmd](a)
 

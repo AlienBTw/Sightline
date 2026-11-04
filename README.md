@@ -10,6 +10,49 @@ Sightline is being built for the **Meta Global AI Developer Hackathon** (Indie t
 
 > **Product direction:** after the models are trained, a mobile app lets workshop supervisors watch their existing cameras live, get hazard push notifications and review flagged clips with the circle overlay. The Streamlit UI in this repo becomes the internal/dev console.
 
+## Live pipeline (built during the event)
+
+[`sightline_pipeline/`](sightline_pipeline/README.md) is the camera-to-alert path:
+- RTSP, video file or uploaded video, through one ingest path
+- V-JEPA 2.1 + concept-bottleneck head on sliding 16-frame windows (263 ms per step on an RTX 3090)
+- smoothed per-factor incidents, with hazard circles
+- SAM 3.1 and Muse Spark escalation through the Meta Model API
+- H.264 clips (raw and with circles), event JSON and a SQLite index
+
+```bash
+~/vjepa-venv/bin/python -m sightline_pipeline.run --source data/demo/sightline_demo.mp4 --camera-id cam_demo
+```
+
+## Backend API (built during the event)
+
+[`backend/`](backend/README.md) is the FastAPI service that the Android app and the dev console use:
+- JWT login for judges (demo role) and an admin
+- RTSP cameras and uploaded videos as looping virtual cameras, with one pipeline worker per camera (3 per GPU)
+- streamed and resumable uploads
+- an events feed with range-streamed clips (raw and with circles)
+- a low-bandwidth MJPEG live view with circles
+- WebSocket alerts and Expo push notifications
+- a web dev console at `/console/`
+- ngrok, watchdog and scheduled-task scripts for judging uptime
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File backend\scripts\start_backend.ps1   # then open http://127.0.0.1:8000/console/
+```
+
+## Android app (built during the event)
+
+[`mobile/`](mobile/README.md) is the supervisor app (Expo SDK 58, React Native, TypeScript):
+- sign in to your own backend URL; tokens kept in the Android Keystore, auto-refresh, HTTPS only
+- a camera grid with live hazard chips, video upload, and RTSP cameras for admins
+- a live view with the server-drawn circles
+- a real-time alerts feed over WebSocket, with notifications that open the event
+- clip review with the circles in sync with playback, the plain-language factors, the SAM 3.1 / Muse Spark verdict, and acknowledge / dismiss
+
+```powershell
+cd mobile; npm install; npx expo run:android                      # development build
+powershell -ExecutionPolicy Bypass -File scripts\build-apk.ps1    # release APK
+```
+
 ## Target stack (Meta build)
 
 | Stage | Tech |

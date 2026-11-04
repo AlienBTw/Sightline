@@ -43,4 +43,5 @@ dev = [
 include = ["sightline*"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "sightline_pipeline/tests", "training/tests", "backend/tests"]
+markers = ["integration: needs the camera simulator binaries (tools/camera_sim), skipped otherwise"]

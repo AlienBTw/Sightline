@@ -70,15 +70,63 @@ def test_voxel_targets_sources_and_masks():
     assert m[i["F3"]] == 0 and m[i["F4"]] == 0   # ignored by default
     assert y[i["F8"]] == 1 and m[i["F8"]] == 1   # from dataset hint
     assert y[i["F9"]] == 0 and m[i["F9"]] == 1
-    assert m[i["F7"]] == 0                       # no hint -> ignored (Glimmer not used for F7-F9)
+    assert y[i["F7"]] == 0 and m[i["F7"]] == 1   # no hint -> explicit negative
     y2, m2 = th.voxel_targets(_row({"F3": "present"}), ignore=[])
     assert y2[i["F3"]] == 1 and m2[i["F3"]] == 1
 
 
 def test_zenodo_targets():
-    assert th.zenodo_targets(2) == ([1.0] + [0.0] * 9, [1.0] + [0.0] * 9)
-    y, m = th.zenodo_targets(0)
-    assert y[0] == 0 and m[0] == 1 and sum(m) == 1
+    y, m = th.zenodo_targets(2)
+    assert y[0] == 1 and m[0] == 1
+    for f in th.ZENODO_NEGATIVE:
+        i = th.FACTORS.index(f)
+        assert y[i] == 0 and m[i] == 1
+    assert m[1] == 0 and m[2] == 0  # F2/F3 stay unlabeled on a saw frame
+    y0, m0 = th.zenodo_targets(0)
+    assert y0[0] == 0 and m0[0] == 1 and sum(m0) == 1 + len(th.ZENODO_NEGATIVE)
+
+
+def _clip(fid_y, fid_m, source="voxel51", label="", clip_id="c"):
+    y, m = [0.0] * 10, [0.0] * 10
+    i = th.FACTORS.index("F9")
+    y[i], m[i] = fid_y, fid_m
+    return {"id": clip_id, "source": source, "y": y, "m": m, "source_label": label, "set": "train"}
+
+
+def test_sampling_weights_boost_hard_negatives_and_closed_panels():
+    src = {"voxel51": 1.0, "zenodo": 0.2}
+    neg = _clip(0, 1, clip_id="neg")
+    easy = _clip(0, 1, clip_id="easy")
+    closed = _clip(0, 1, label="Closed Panel Cover", clip_id="closed")
+    opened = _clip(1, 1, label="Opened Panel Cover", clip_id="opened")
+    saw = _clip(0, 1, source="zenodo", clip_id="saw")
+    rows = [neg, easy, closed, opened, saw]
+    scores = {"neg": 0.91, "easy": 0.2, "closed": 0.1, "opened": 0.99, "saw": 0.99}
+    w = th.sampling_weights(rows, src, scores, "F9", 0.8)
+    assert w == [5.0, 1.0, 5.0, 1.0, 0.2]
+    assert th.sampling_weights(rows, src, None) == [1.0, 1.0, 1.0, 1.0, 0.2]
+
+
+def test_zenodo_f9_frac_clears_train_only():
+    def row(i, split_set):
+        y, m = th.zenodo_targets(1)
+        return {"id": f"z{i}", "source": "zenodo", "y": y, "m": m, "set": split_set}
+    rows = [row(0, "train"), row(1, "train"), row(2, "val"), row(3, "test")]
+    assert th.mask_zenodo_f9(rows, 0.0) == 2
+    i = th.FACTORS.index("F9")
+    assert rows[0]["m"][i] == 0 and rows[1]["m"][i] == 0
+    assert rows[2]["m"][i] == 1 and rows[3]["m"][i] == 1
+    kept = [row(k, "train") for k in range(4)]
+    assert th.mask_zenodo_f9(kept, 1.0) == 0
+    assert all(r["m"][i] == 1 for r in kept)
+    assert th.zenodo_f9_keep("same", 0.5, 0) == th.zenodo_f9_keep("same", 0.5, 0)
+
+
+def test_precision_threshold_prefers_the_precise_cut():
+    y = [1, 1, 0, 0]
+    p = [0.9, 0.4, 0.7, 0.1]
+    assert th.precision_threshold(y, p, 0.8) == 0.9
+    assert th.best_f1_threshold(y, p) == 0.4
 
 
 def test_box_patch_mask_and_yolo(tmp_path):
