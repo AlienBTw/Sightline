@@ -2,11 +2,37 @@
 
 **A live workshop hazard watcher that circles the danger in the frame.**
 
-Sightline is being built for the **Meta Global AI Developer Hackathon** (Indie track, Oct 26 – Nov 4 2026). Meta's V-JEPA 2.1 encoder runs locally on the camera stream. A trained concept-bottleneck head predicts 11 named hazard factors, then a risk score, and the per-patch activations are drawn as a circle around the hazard area. SAM 3.1 and Muse Spark (Meta Model API) are called only when something is flagged.
+Sightline is being built for the **Meta Global AI Developer Hackathon** (Indie track, Oct 26 – Nov 4 2026). Meta's V-JEPA 2.1 encoder runs locally on the camera stream. A trained concept-bottleneck head predicts 11 named hazard factors, then a risk score, and the per-patch activations are drawn as a circle around the hazard area. SAM 3.1 and Muse Spark 1.3 Contributor (`muse-spark-1.3-contributor`, Meta Model API) are called only when something is flagged.
 
 > **Disclaimer:** Sightline is a decision-support demo. It is **not** a certified safety system and must not replace formal EHS controls, inspections, or regulatory compliance.
 
-> **Status:** repo `AlienBTw/Sightline` (private, `main`, fresh history from Oct 30). The code currently here is the **pre-event MVP** (written Oct 13–14, before the Meta event started on Oct 26), kept as **reference only**. The core pipeline is rebuilt during the event window (the participant guide reportedly requires new work). The build plan lives outside this repo, in the hackathon planning folder (`PLAN.md`, `18-mobile-app.md`).
+> **Status (Nov 4 2026):** the live pipeline, the backend, the Android app and a CCTV camera simulator were built during the event and run end to end: a simulated RTSP camera feeds the backend, the pipeline circles the hazard, and the app gets the alert with the circled clip. The legacy MVP sections further down (written Oct 13-14, before the event) are kept for reference only.
+
+## What alerts today
+
+| Factor | When it alerts | Circle |
+|---|---|---|
+| **F1** hand in a machine's danger zone | V-JEPA 2.1 features + the concept-bottleneck head (`h3_wide`), smoothed with hysteresis | Head patch map, trained on Fraunhofer hand boxes; SAM 3.1 snaps it to the hand on escalation |
+| **F2** no head protection, **F5** no hi-vis vest | The head score is only a trigger (F2 0.5, F5 0.15). One **Muse Spark 1.3 Contributor** request with up to 3 frames must find a person without the protection on at least 2 of 3 frames. A rejection, timeout, bad answer, missing key or budget cap fails closed: the clip is stored, no alert is sent. | **SAM 3.1** `head` box (F2) and `person` torso (F5), drawn within +-1.5 s of the frame SAM saw; the event thumbnail is that frame. No SAM box: the head-map circle, marked `head_map_fallback` |
+| F6-F10 | Scored and stored, muted (they raised false positives on live video) | - |
+| F3, F4, F11 | Hidden (no usable labels, or not a head output) | - |
+
+## Meta Model API budget
+
+Every escalation (SAM 3.1 + Muse Spark, counted as one slot) is capped: **1 per incident, 2 per minute per camera, 3 per camera session** (camera start to stop; a looping video stays in one session) and **30 per local day** across cameras and restarts. `SIGHTLINE_ESC_MAX_PER_SESSION` and `SIGHTLINE_ESC_MAX_PER_DAY` override the last two (`0` means no calls). Only submitted calls count. A refused check is still saved, as `skipped_budget` with the most permanent reason first (`daily_cap`, `session_cap`, `incident_cap`, `minute_cap`); with no API key it is `skipped_no_key`. The daily counter lives in `data/live/escalation_budget.json` (gitignored).
+
+## Meta tooling
+
+| Model | Where it runs | What it does |
+|---|---|---|
+| **V-JEPA 2.1** ViT-L/16 384 (open weights, MIT) | Locally on the GPU, always on | Video features for the concept-bottleneck head (16-frame windows) |
+| **SAM 3.1** (`sam-3.1`) | Meta Model API, only on escalation | Snaps circles to the hand (F1), head (F2) and torso (F5) |
+| **Muse Spark 1.3 Contributor** (`muse-spark-1.3-contributor`) | Meta Model API, only on escalation | Verdict for flagged incidents, the F2/F5 2-of-3 verify gate, and offline F2/F5 labels for 383 video clips ([`training/08-video-ppe`](training/08-video-ppe/README.md)) |
+| **Muse Glimmer 30B** (Apache 2.0) | Locally, offline | Weak clip labels for F1-F10 ([`training/02-labeling`](training/02-labeling/README.md)) |
+
+## How it was built
+
+The event code was written with Cursor, mostly through the headless Cursor CLI (`cursor-agent -p`) driven from prompt files, with every change checked by the test suites: `pytest` in WSL (pipeline, backend, training) and `tsc` + Jest for the app.
 
 > **Product direction:** after the models are trained, a mobile app lets workshop supervisors watch their existing cameras live, get hazard push notifications and review flagged clips with the circle overlay. The Streamlit UI in this repo becomes the internal/dev console.
 
@@ -16,7 +42,7 @@ Sightline is being built for the **Meta Global AI Developer Hackathon** (Indie t
 - RTSP, video file or uploaded video, through one ingest path
 - V-JEPA 2.1 + concept-bottleneck head on sliding 16-frame windows (263 ms per step on an RTX 3090)
 - smoothed per-factor incidents, with hazard circles
-- SAM 3.1 and Muse Spark escalation through the Meta Model API
+- SAM 3.1 and Muse Spark 1.3 Contributor (`muse-spark-1.3-contributor`) escalation through the Meta Model API
 - H.264 clips (raw and with circles), event JSON and a SQLite index
 
 ```bash
@@ -46,7 +72,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File backend\scripts\start_backen
 - a camera grid with live hazard chips, video upload, and RTSP cameras for admins
 - a live view with the server-drawn circles
 - a real-time alerts feed over WebSocket, with notifications that open the event
-- clip review with the circles in sync with playback, the plain-language factors, the SAM 3.1 / Muse Spark verdict, and acknowledge / dismiss
+- clip review with the circles in sync with playback, the plain-language factors, the SAM 3.1 / Muse Spark 1.3 Contributor verdict, and acknowledge / dismiss
 
 ```powershell
 cd mobile; npm install; npx expo run:android                      # development build
@@ -60,11 +86,12 @@ powershell -ExecutionPolicy Bypass -File scripts\build-apk.ps1    # release APK
 | Always-on encoder | Meta **V-JEPA 2.1** (MIT), ViT-B 80M or ViT-L 300M, 384 px, 64-frame clips, dense per-patch features |
 | Hazard head | Concept-bottleneck: 11 hazard factors (F1–F11) → risk; per-patch activations → circle/ellipse overlay |
 | Anomaly (F11) | V-JEPA prediction error |
-| Escalation only | **SAM 3.1** (mask) + **Muse Spark** (reasoning) via the Meta Model API |
+| Escalation only | **SAM 3.1** (mask) + **Muse Spark 1.3 Contributor** (`muse-spark-1.3-contributor`, reasoning) via the Meta Model API |
 | Offline labeling | **Muse Glimmer 30B** (Apache 2.0, Q4) through **Ollama**, OpenAI-compatible at `http://localhost:11434/v1` |
+| Offline PPE video labels | **Muse Spark 1.3 Contributor** clip verdicts for F2/F5 ([`training/08-video-ppe`](training/08-video-ppe/README.md)) |
 | UI / API | Streamlit + FastAPI + SQLite |
 
-## Current MVP stack (reference)
+## Legacy MVP stack (pre-event reference)
 
 | Stage | Tech |
 |---|---|
@@ -78,7 +105,7 @@ powershell -ExecutionPolicy Bypass -File scripts\build-apk.ps1    # release APK
 
 MIT-compliant code. **No** Ultralytics / YOLO-World / YOLOv8 (AGPL/GPL).
 
-## Quick start
+## Legacy MVP quick start (pre-event reference)
 
 ```bash
 cp .env.example .env
@@ -145,6 +172,15 @@ Streamlit (UI) ──HTTPS──► FastAPI (API)
 
 The UI never loads detector or VLM weights. `GET /system` reports torch/device info and stage latencies.
 
+## Limitations and future work
+
+- **F2/F5 need Muse Spark.** Retraining the head on Muse-labelled video learned the video source, not the helmet: on held-out Pexels clips F2 AUROC stayed at 0.19-0.58 while the head separated Voxel51 from Pexels clips at domain AUROC 0.54-1.00 (most runs 0.97-1.00). Details: [`training/04-head/results/PPE_SHORTCUT.md`](training/04-head/results/PPE_SHORTCUT.md) and [`training/08-video-ppe`](training/08-video-ppe/README.md). `h3_wide` stays live and the verify gates decide F2/F5.
+- **Data we still need:** same-camera, paired helmet / no-helmet and vest / no-vest footage, so the source of a clip cannot predict its label, plus a small hand-labelled out-of-distribution test set from real workshop cameras.
+- **Model:** the V-JEPA 2.1 trunk is frozen. A partial fine-tune of its last blocks is planned once paired data exists.
+- **Only F1 is validated from the head alone.** F6-F10 are muted. The demo footage comes from the held-out test splits of the training datasets plus Pexels clips; real-workshop accuracy is untested.
+- **Verify gates cost API calls and seconds.** One check per incident, capped per session and day. A slow reply (30 s timeout) fails closed, so an incident can go unreported. A gate check and an F1 escalation share the one slot per incident.
+- **SAM circles are a snapshot.** They are drawn only within +-1.5 s of the frame SAM saw, so the rest of a long clip shows the label without a circle.
+
 ## Licence + model weights
 
 Code: MIT (see [LICENSE](LICENSE)). **Verify weight licences before going public.**
@@ -153,7 +189,7 @@ Code: MIT (see [LICENSE](LICENSE)). **Verify weight licences before going public
 |---|---|---|
 | V-JEPA 2.1 | `facebookresearch/vjepa2` | MIT |
 | Muse Glimmer 30B | Ollama `muse-glimmer:30b` | Apache 2.0 |
-| SAM 3.1 / Muse Spark | Meta Model API | Follow the API terms |
+| SAM 3.1 / Muse Spark 1.3 Contributor | Meta Model API | `muse-spark-1.3-contributor`. Follow the API terms |
 | LLMDet | Hugging Face `iSEE-Laboratory/llmdet_*` | Check model card licence |
 | OWLv2 | Hugging Face OWL-ViT / OWLv2 | Apache-2.0 typical — confirm card |
 | RT-DETR / D-FINE | HF checkpoints | Confirm card; avoid AGPL YOLO |

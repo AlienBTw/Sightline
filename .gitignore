@@ -125,3 +125,10 @@ backend/**/*.part
 *.pem
 *.key
 
+# Env globs, label dumps, and private demo notes
+.env*
+!.env.example
+*.jsonl
+DEMO_SCENARIO*.md
+**/DEMO_SCENARIO*.md
+

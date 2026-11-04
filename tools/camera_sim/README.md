@@ -30,10 +30,12 @@ Every stream has a camera-style OSD (name + clock). Both transports work: the ba
 ```powershell
 # Windows (runs inside WSL, detached; logs + PIDs in F:\models\logs\camsim)
 powershell -ExecutionPolicy Bypass -File tools\camera_sim\start_sim.ps1           # server + 4 cameras
-powershell -ExecutionPolicy Bypass -File tools\camera_sim\stop_sim.ps1 pub 201    # unplug camera 2
-powershell -ExecutionPolicy Bypass -File tools\camera_sim\start_sim.ps1 pub 201   # plug it back in
+powershell -ExecutionPolicy Bypass -File tools\camera_sim\stop_sim.ps1 -Distro Ubuntu-24.04 pub 201    # unplug camera 2
+powershell -ExecutionPolicy Bypass -File tools\camera_sim\start_sim.ps1 -Distro Ubuntu-24.04 pub 201   # plug it back in
 powershell -ExecutionPolicy Bypass -File tools\camera_sim\stop_sim.ps1            # stop everything
 ```
+
+Pass `-Distro` whenever you add stream arguments: the first positional argument binds to `-Distro`, so `start_sim.ps1 pub 101` fails with `WSL_E_DISTRO_NOT_FOUND`. A publisher started from a short-lived `wsl.exe` stops when that `wsl.exe` exits; for a long demo start it from one that stays open, for example `wsl.exe -d Ubuntu-24.04 -- bash -c "bash tools/camera_sim/start_sim.sh pub 101; exec sleep infinity"`. `CAMSIM_DEMO=<file>` swaps the clip that streams 101, 102 and 301 play.
 
 ```bash
 # WSL
