@@ -1,0 +1,107 @@
+{
+ "split": "zenodo test",
+ "images_with_hands": 3590,
+ "frame": [
+  1920,
+  1080
+ ],
+ "head": "h3_wide",
+ "results": [
+  {
+   "map": "evidence",
+   "rel_threshold": 0.4,
+   "n": 3590,
+   "point": 0.8632,
+   "hit": 0.9085,
+   "iou": 0.2906,
+   "iou_enc": 0.4816,
+   "radius": 0.1364
+  },
+  {
+   "map": "evidence",
+   "rel_threshold": 0.55,
+   "n": 3590,
+   "point": 0.8953,
+   "hit": 0.8705,
+   "iou": 0.364,
+   "iou_enc": 0.5841,
+   "radius": 0.1191
+  },
+  {
+   "map": "evidence",
+   "rel_threshold": 0.7,
+   "n": 3590,
+   "point": 0.9368,
+   "hit": 0.8384,
+   "iou": 0.4664,
+   "iou_enc": 0.6693,
+   "radius": 0.1026
+  },
+  {
+   "map": "attention",
+   "rel_threshold": 0.4,
+   "n": 3590,
+   "point": 0.993,
+   "hit": 0.5734,
+   "iou": 0.418,
+   "iou_enc": 0.3419,
+   "radius": 0.0475
+  },
+  {
+   "map": "attention",
+   "rel_threshold": 0.55,
+   "n": 3590,
+   "point": 0.9939,
+   "hit": 0.526,
+   "iou": 0.3594,
+   "iou_enc": 0.2814,
+   "radius": 0.0416
+  },
+  {
+   "map": "attention",
+   "rel_threshold": 0.7,
+   "n": 3590,
+   "point": 0.993,
+   "hit": 0.4983,
+   "iou": 0.3415,
+   "iou_enc": 0.2675,
+   "radius": 0.0401
+  },
+  {
+   "map": "attention_x_evidence",
+   "rel_threshold": 0.4,
+   "n": 3590,
+   "point": 0.993,
+   "hit": 0.573,
+   "iou": 0.4183,
+   "iou_enc": 0.342,
+   "radius": 0.0475
+  },
+  {
+   "map": "attention_x_evidence",
+   "rel_threshold": 0.55,
+   "n": 3590,
+   "point": 0.9939,
+   "hit": 0.526,
+   "iou": 0.3596,
+   "iou_enc": 0.2815,
+   "radius": 0.0416
+  },
+  {
+   "map": "attention_x_evidence",
+   "rel_threshold": 0.7,
+   "n": 3590,
+   "point": 0.993,
+   "hit": 0.4986,
+   "iou": 0.3419,
+   "iou_enc": 0.2677,
+   "radius": 0.0401
+  }
+ ],
+ "baseline_mean_train_centre": {
+  "point": 0.1404,
+  "hit": 0.2599,
+  "iou": 0.1091
+ },
+ "seconds": 300.3
+}

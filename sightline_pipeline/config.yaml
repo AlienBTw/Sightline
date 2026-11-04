@@ -1,0 +1,60 @@
+﻿# Sightline live pipeline defaults. Override with --config <file> or SIGHTLINE_* env vars.
+# Paths are relative to the repo root unless absolute.
+model:
+  # h5_negatives (explicit F7-F9 negatives) replayed on the demo video 2026-11-01:
+  # F6/F7/F8/F10 stayed quiet and F1 still fired on the saw, but F9 still opened
+  # incidents at 0.98, and the new F1 threshold collapsed to the 0.05 floor.
+  # Live circles stay on h3_wide until a head clears F9 on this video too.
+  head_checkpoint: training/04-head/checkpoints/h3_wide.pt
+  encoder_weights: ~/models/vjepa/vjepa2_1_vitl_384_encoder_fp16.pt
+  vjepa_repo: ~/vjepa2
+  device: cuda:0
+sampling:
+  frames_per_window: 16        # same as training (8 temporal tokens)
+  sample_interval_s: 0.16      # = frame step 4 at 25 fps, as in training
+  stride_s: 1.0                # run the model about once per second
+  mil_windows: 2               # head pools over the last N windows (MIL, like clip-level training)
+events:
+  ema_alpha: 0.6               # temporal smoothing of factor probabilities
+  min_on_steps: 2              # consecutive smoothed scores >= threshold to switch a factor on
+  min_off_steps: 2
+  off_ratio: 0.7               # hysteresis: off when smoothed score < threshold * off_ratio
+  merge_gap_s: 4.0             # incident closes after this long with no factor on
+  max_incident_s: 20.0         # long hazards are split so clips stay short (mobile / ngrok bandwidth)
+  # Thresholds default to the validation-chosen ones saved in the head checkpoint
+  # (training/04-head/results/h3_wide.json "thresholds"). Override per factor here:
+  # Live runs pool only mil_windows windows, while the val thresholds were picked on whole clips (up to 8
+  # windows) and, for F6/F7, from 1-8 validation positives (0.026 / 0.007). Raised for live use:
+  threshold_overrides: {F6: 0.5, F7: 0.5}
+  min_threshold: 0.05          # floor: clip-level thresholds of very sparse factors are tiny
+  hidden_factors: [F3, F4, F11]   # F3/F4 untrained, F11 not part of the head
+  # Scored and stored, but never open an incident.
+  # F2/F5: Glimmer labels are ~80% 'present' (F2 not evaluable).
+  # F6-F10: live demo fired these at 0.55-1.0 off the scenes they were trained on
+  # (F7/F8/F9 were masked wherever the class hint was missing). Only F1 alerts
+  # until a checkpoint trained with those negatives earns them back.
+  muted_factors: [F2, F5, F6, F7, F8, F9, F10]
+clips:
+  pre_s: 4.0
+  post_s: 4.0
+  width: 960                   # stored clip width (height keeps aspect)
+  fps_cap: 25
+localization:
+  rel_threshold: 0.7           # region = connected area >= rel_threshold * map peak
+  min_radius_frac: 0.04        # of frame diagonal
+  max_radius_frac: 0.35
+  radius_scale: 1.25
+  max_circles: 1
+  # which head map to circle: evidence = sigmoid(s_f) patch evidence (F1 is patch-supervised on
+  # the Zenodo hand boxes), attention = MIL softmax weights, attention_x_evidence = product
+  map_mode: {F1: evidence, default: attention}
+  image_pass_factors: [F1]     # extra single-frame encoder pass for these factors' maps (+~30 ms)
+escalation:
+  enabled: true
+  high_severity: [F1, F6, F7, F10]   # always escalated once per incident
+  uncertain_band: [1.0, 1.6]   # also escalate when peak score / threshold falls in this band
+  max_per_incident: 1   # credits are limited: one Meta API check per incident
+  max_per_minute: 2
+  timeout_s: 30
+storage:
+  data_dir: data/live          # gitignored
