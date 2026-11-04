@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Sightline dev console</title>
+<link rel="stylesheet" href="/console/style.css">
+<script src="/console/app.js" defer></script>
+</head>
+<body>
+<header>
+  <div class="brand"><span class="dot"></span> Sightline <small>dev console</small></div>
+  <div id="who" class="muted"></div>
+  <button id="logout" class="ghost hidden">Log out</button>
+</header>
+
+<main>
+  <section id="login-view" class="card narrow">
+    <h2>Sign in</h2>
+    <form id="login-form" autocomplete="on">
+      <label>Username <input id="username" name="username" autocomplete="username" required maxlength="64"></label>
+      <label>Password <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="256"></label>
+      <button type="submit">Sign in</button>
+      <p id="login-error" class="error"></p>
+    </form>
+  </section>
+
+  <div id="app-view" class="hidden">
+    <div class="grid2">
+      <section class="card" id="rtsp-card">
+        <h2>Add an RTSP camera <small class="muted">admin only</small></h2>
+        <form id="rtsp-form">
+          <input id="rtsp-name" placeholder="Name, e.g. Phone IP camera" required maxlength="60">
+          <input id="rtsp-uri" placeholder="rtsp://192.168.1.20:8554/live" required maxlength="500">
+          <button type="submit">Add and start</button>
+        </form>
+        <p id="rtsp-msg" class="muted"></p>
+      </section>
+    </div>
+
+    <section class="card">
+      <h2>Cameras <small id="capacity" class="muted"></small></h2>
+      <div id="cameras" class="cams"></div>
+    </section>
+
+    <section class="card">
+      <h2>Events <small id="ws-state" class="muted">live: off</small></h2>
+      <div class="filters">
+        <select id="f-status"><option value="">All statuses</option><option>open</option><option>acknowledged</option><option>dismissed</option><option>fix_pending</option></select>
+        <select id="f-camera"><option value="">All cameras</option></select>
+        <button id="refresh-events" class="ghost">Refresh</button>
+      </div>
+      <div class="events-layout">
+        <div id="events" class="events"></div>
+        <div id="detail" class="detail muted">Select an event to play the flagged clip.</div>
+      </div>
+      <div class="pager"><button id="more" class="ghost hidden">Load more</button></div>
+    </section>
+  </div>
+</main>
+<footer class="muted">Decision-support demo, not a certified safety system.</footer>
+</body>
+</html>
