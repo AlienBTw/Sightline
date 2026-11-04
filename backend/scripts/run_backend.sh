@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
-# Run the Sightline backend in the foreground (WSL, ~/vjepa-venv). start_backend.ps1 launches this
-# detached through a hidden wsl.exe so WSL stays up. Logs: $SIGHTLINE_LOG_DIR (default F:\models\logs).
+# Run the Sightline backend in the foreground. start_backend.ps1 launches this
+# detached through a hidden wsl.exe so WSL stays up.
+# Interpreter: $SIGHTLINE_PY, else <work>/venv/bin/python if present, else `python` on PATH.
+# Logs: $SIGHTLINE_LOG_DIR (default <repo>/work/logs).
 set -euo pipefail
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="$(cd "$HERE/../.." && pwd)"
-PY="${SIGHTLINE_PY:-$HOME/vjepa-venv/bin/python}"
-export SIGHTLINE_LOG_DIR="${SIGHTLINE_LOG_DIR:-/mnt/f/models/logs}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "$SCRIPT_DIR/../.." && pwd)"
+WORK="${SIGHTLINE_WORK_DIR:-$REPO/work}"
+if [[ -z "${SIGHTLINE_PY:-}" && -x "$WORK/venv/bin/python" ]]; then SIGHTLINE_PY="$WORK/venv/bin/python"; fi
+PY="${SIGHTLINE_PY:-python}"
+export SIGHTLINE_LOG_DIR="${SIGHTLINE_LOG_DIR:-$WORK/logs}"
 HOST="${SIGHTLINE_HOST:-127.0.0.1}"
 PORT="${SIGHTLINE_PORT:-8000}"
 PIDFILE="$SIGHTLINE_LOG_DIR/sightline_backend.pid"

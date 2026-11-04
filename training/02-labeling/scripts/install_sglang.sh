@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sightline: install SGLang into a user venv in WSL Ubuntu (no sudo). Log: F:\models\logs\sglang_install.log
+# Sightline: install SGLang into a user venv in WSL Ubuntu (no sudo). Log: <repo>/work/logs/sglang_install.log (SIGHTLINE_WORK_DIR, default <repo>/work).
 set -euo pipefail
 echo "[$(date '+%F %T')] start"
 if ! command -v uv >/dev/null && [ ! -x ~/.local/bin/uv ]; then curl -LsSf https://astral.sh/uv/install.sh | sh; fi

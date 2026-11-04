@@ -2,8 +2,9 @@
 
 Prompts: head, hard hat, helmet, safety vest, high-visibility vest, person.
 ``--backend local`` encodes each keyframe once and reuses that embedding for
-every prompt. A ``.pt`` checkpoint (the default path
-``/mnt/f/models/sam3.1/sam3.1_multiplex.pt``) loads through
+every prompt. A ``.pt`` checkpoint (the default is
+``<SIGHTLINE_WORK_DIR>/models/sam3.1/sam3.1_multiplex.pt``, work dir default
+``<repo>/work``) loads through
 ``build_sam3_image_model(..., load_from_HF=False, checkpoint_path=...)``.
 The ungated unsloth/sam3.1 mirror is a transformers ``Sam3Model`` directory
 (``model.safetensors``); pass that directory as ``--checkpoint``. Default GPU
@@ -15,7 +16,7 @@ so the live demo on GPU 0 is not touched. ``--backend api`` calls Meta
 
 ``--dry-run`` prints the plan and does not load weights or send HTTP.
 
-  CUDA_VISIBLE_DEVICES=1 /home/user/sam3-venv/bin/python tools/labeling/sam_label.py --backend local --gpu 1 --checkpoint /mnt/f/models/sam3.1
+  CUDA_VISIBLE_DEVICES=1 python tools/labeling/sam_label.py --backend local --gpu 1
   python tools/labeling/sam_label.py --backend api --dry-run --max-api-calls 0
 """
 from __future__ import annotations
@@ -29,16 +30,18 @@ import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
+WORK = Path(os.environ.get("SIGHTLINE_WORK_DIR", REPO / "work"))
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "tools" / "labeling"))
 
 import ppe_rules  # noqa: E402
 
-DEFAULT_INDEX = Path("/mnt/f/models/vidlabel/frames/index.jsonl")
-DEFAULT_CACHE = Path("/mnt/f/models/vidlabel/sam_cache")
-DEFAULT_OUT = Path("/mnt/f/models/vidlabel/sam_windows.jsonl")
-DEFAULT_LOG = Path("/mnt/f/models/vidlabel/sam_api_calls.jsonl")
-DEFAULT_CKPT = Path("/mnt/f/models/sam3.1/sam3.1_multiplex.pt")
+_VID = WORK / "vidlabel"
+DEFAULT_INDEX = _VID / "frames" / "index.jsonl"
+DEFAULT_CACHE = _VID / "sam_cache"
+DEFAULT_OUT = _VID / "sam_windows.jsonl"
+DEFAULT_LOG = _VID / "sam_api_calls.jsonl"
+DEFAULT_CKPT = WORK / "models" / "sam3.1" / "sam3.1_multiplex.pt"
 RULE_VERSION = 2
 
 

@@ -5,8 +5,11 @@
 #   bash tools/camera_sim/start_onvif.sh        (start_sim.sh must be running)
 #   bash tools/camera_sim/stop_sim.sh           stops it too
 set -euo pipefail
-BIN="${CAMSIM_BIN:-/mnt/f/models/camsim/bin}"; ROOT="$(dirname "$BIN")"
-LOG="${CAMSIM_LOG:-/mnt/f/models/logs/camsim}"; mkdir -p "$LOG"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "$SCRIPT_DIR/../.." && pwd)"
+WORK="${SIGHTLINE_WORK_DIR:-$REPO/work}"
+BIN="${CAMSIM_BIN:-$WORK/camsim/bin}"; ROOT="$(dirname "$BIN")"
+LOG="${CAMSIM_LOG:-$WORK/logs/camsim}"; mkdir -p "$LOG"
 NODE="$ROOT/node/bin"; SRV="$ROOT/onvif-server"
 if [[ ! -x "$NODE/node" ]]; then
   V=$(curl -s https://nodejs.org/dist/index.json | grep -o '"version":"v22[^"]*"' | head -1 | cut -d'"' -f4)

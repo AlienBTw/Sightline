@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import time
 from pathlib import Path
 
@@ -23,10 +24,12 @@ import numpy as np
 from . import localize
 from .config import REPO, load_config, resolve_path
 
+WORK = Path(os.environ.get("SIGHTLINE_WORK_DIR", REPO / "work"))
+
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
-    ap.add_argument("--features", default="/mnt/f/sightline_features/vjepa2_1_vitl_384")
+    ap.add_argument("--features", default=str(WORK / "features" / "vjepa2_1_vitl_384"))
     ap.add_argument("--out", default=str(REPO / "sightline_pipeline/results/circles_zenodo_test.json"))
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--rel", default="0.4,0.55,0.7")

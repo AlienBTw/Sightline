@@ -2,7 +2,7 @@
 camera status and events, measure load, then delete the cameras.
 
   SIGHTLINE_URL=http://127.0.0.1:8000 CAMTEST_USER=... CAMTEST_PASS=... \
-  ~/vjepa-venv/bin/python tools/camera_sim/backend_check.py --seconds 120
+  python tools/camera_sim/backend_check.py --seconds 120
 """
 from __future__ import annotations
 

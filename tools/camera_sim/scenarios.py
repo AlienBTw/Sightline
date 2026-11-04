@@ -1,6 +1,6 @@
 """Robustness scenarios for Sightline's RTSP ingest against the simulator (start_sim.sh must be running).
 
-  ~/vjepa-venv/bin/python tools/camera_sim/scenarios.py [--only name,name] [--out results.json]
+  python tools/camera_sim/scenarios.py [--only name,name] [--out results.json]
 
 No GPU needed: this drives sightline_pipeline.ingest.VideoSource (the exact code path the pipeline and
 the backend camera workers use) and the simulator's start/stop scripts.
@@ -18,14 +18,15 @@ import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
+WORK = Path(os.environ.get("SIGHTLINE_WORK_DIR", REPO / "work"))
 sys.path.insert(0, str(REPO))
 from sightline_pipeline.ingest import VideoSource  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 HOST = os.environ.get("CAMSIM_HOST", "127.0.0.1")
 CRED = "admin:Sightline2026"
-LOG = Path(os.environ.get("CAMSIM_LOG", "/mnt/f/models/logs/camsim"))
-BIN = Path(os.environ.get("CAMSIM_BIN", "/mnt/f/models/camsim/bin"))
+LOG = Path(os.environ.get("CAMSIM_LOG", WORK / "logs" / "camsim"))
+BIN = Path(os.environ.get("CAMSIM_BIN", WORK / "camsim" / "bin"))
 PUB = "rtsp://publisher:pub-local-only@127.0.0.1:8554"
 
 

@@ -8,7 +8,7 @@ Contributor (``muse-spark-1.3-contributor``). The id actually used is printed.
 the .env file, or the budget.
 
 A real call refuses when this run's ``--max-calls`` (default 0) is exhausted or
-when the persistent counter ``/mnt/f/models/vidlabel/muse_budget.json`` has
+when the persistent counter ``<SIGHTLINE_WORK_DIR>/vidlabel/muse_budget.json`` has
 already reached ``--budget-total`` (default 400). The counter is shared across
 runs and is never raised past that total. Every real call, including a parse
 failure and a ``--redo-parse-errors`` retry, is appended to ``muse_calls.jsonl``
@@ -28,6 +28,7 @@ import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
+WORK = Path(os.environ.get("SIGHTLINE_WORK_DIR", REPO / "work"))
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "training" / "01-data"))
 sys.path.insert(0, str(REPO / "tools" / "labeling"))
@@ -46,11 +47,12 @@ _JSON_OBJECT = re.compile(r"\{.*\}", re.S)
 DEFAULT_MANIFEST = REPO / "training" / "data" / "ppe_video_manifest.jsonl"
 DEFAULT_VOXEL = REPO / "training" / "data" / "manifest.jsonl"
 DEFAULT_WEAK = REPO / "training" / "02-labeling" / "outputs" / "weak_labels_v2_vllm.jsonl"
-DEFAULT_INDEX = Path("/mnt/f/models/vidlabel/frames/index.jsonl")
-DEFAULT_SAM = Path("/mnt/f/models/vidlabel/sam_windows.jsonl")
-DEFAULT_BUDGET = Path("/mnt/f/models/vidlabel/muse_budget.json")
-DEFAULT_LOG = Path("/mnt/f/models/vidlabel/muse_calls.jsonl")
-DEFAULT_OUT = Path("/mnt/f/models/vidlabel/muse_verdicts.jsonl")
+_VID = WORK / "vidlabel"
+DEFAULT_INDEX = _VID / "frames" / "index.jsonl"
+DEFAULT_SAM = _VID / "sam_windows.jsonl"
+DEFAULT_BUDGET = _VID / "muse_budget.json"
+DEFAULT_LOG = _VID / "muse_calls.jsonl"
+DEFAULT_OUT = _VID / "muse_verdicts.jsonl"
 BUDGET_TOTAL = 400
 
 PROMPT = """You check a short workshop video for two hazards. Three frames from the same clip are attached, in time order.

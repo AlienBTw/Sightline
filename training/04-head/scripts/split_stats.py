@@ -2,18 +2,20 @@
 
 Uses the same assign_split / cv_fold / voxel_targets as train_head.py, the feature index
 from 03 and the manifest/weak labels from 01/02. Prints JSON to stdout.
-Usage (from training/):  python 04-head/scripts/split_stats.py [--features F:/sightline_features/vjepa2_1_vitl_384]
+Usage (from training/):  python 04-head/scripts/split_stats.py [--features <SIGHTLINE_WORK_DIR>/features/vjepa2_1_vitl_384]
 """
-import argparse, json, sys
+import argparse, json, os, sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
 T = Path(__file__).resolve().parents[2]
+REPO = T.parent
+WORK = Path(os.environ.get("SIGHTLINE_WORK_DIR", REPO / "work"))
 sys.path.insert(0, str(T / "04-head"))
 from train_head import FACTORS, assign_split, cv_fold, voxel_targets  # noqa: E402
 
 ap = argparse.ArgumentParser()
-ap.add_argument("--features", default="F:/sightline_features/vjepa2_1_vitl_384")
+ap.add_argument("--features", default=str(WORK / "features" / "vjepa2_1_vitl_384"))
 ap.add_argument("--labels", default="02-labeling/outputs/weak_labels_v2_vllm.jsonl")
 ap.add_argument("--stride", type=int, default=2)
 a = ap.parse_args()

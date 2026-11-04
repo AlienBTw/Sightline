@@ -3,7 +3,7 @@
   python tools/labeling/compare_heads.py
 
 Reads training/04-head/results/<run>.json and <run>_eval.json, plus
-/mnt/f/models/ppe_eval/<run>/replay_summary.json when that replay exists.
+``<SIGHTLINE_WORK_DIR>/ppe_eval/<run>/replay_summary.json`` when that replay exists.
 Default runs are h3_wide and every results file whose name starts with ppe_.
 Writes training/04-head/results/PPE_COMPARISON.md.
 
@@ -15,12 +15,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
+WORK = Path(os.environ.get("SIGHTLINE_WORK_DIR", REPO / "work"))
 RESULTS = REPO / "training" / "04-head" / "results"
-REPLAY_ROOT = Path("/mnt/f/models/ppe_eval")
+REPLAY_ROOT = WORK / "ppe_eval"
 TOL = 0.01
 PPE_AUROC_MIN = 0.75
 

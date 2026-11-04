@@ -21,7 +21,7 @@ An earlier pass in this folder used the Muse Spark clip verdicts without SAM box
 
 ## How to run
 
-From the repo root in WSL, with `PY=/home/user/vjepa-venv/bin/python`:
+From the repo root in WSL, with `PY=python` from your venv:
 
 ```bash
 # clips, manifest, keyframes, labels (see tools/labeling/README.md for the budgets)
@@ -32,11 +32,13 @@ $PY tools/labeling/muse_verify.py --source ppe_video --model muse-spark-1.3-cont
 $PY tools/labeling/merge_labels.py
 
 # features, cache, retrain (example: only F2/F5 trainable)
+# SIGHTLINE_WORK_DIR defaults to <repo>/work
+WORK="${SIGHTLINE_WORK_DIR:-$PWD/work}"
 $PY training/03-features/extract_features.py --sources ppe_video --gpu 1
-$PY training/04-head/train_head.py cache --sources ppe_video --out ~/sightline_cache/ppe_video_p2
+$PY training/04-head/train_head.py cache --sources ppe_video --out "$WORK/cache/ppe_video_p2"
 $PY training/04-head/train_head.py train --name ppe_ft_frz --gpu 1 --hidden 512 --dropout 0.2 \
   --init-checkpoint training/04-head/checkpoints/h3_wide.pt \
-  --ppe-labels training/data/ppe_video_labels.jsonl --ppe-cache ~/sightline_cache/ppe_video_p2 \
+  --ppe-labels training/data/ppe_video_labels.jsonl --ppe-cache "$WORK/cache/ppe_video_p2" \
   --ppe-override-voxel --mask-glimmer-f2f5 --ppe-patch-loss 0 \
   --lr 5e-4 --freeze-except F2,F5 --ppe-weight 0.25
 

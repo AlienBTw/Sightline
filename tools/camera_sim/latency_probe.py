@@ -24,6 +24,7 @@ from pathlib import Path
 import numpy as np
 
 REPO = Path(__file__).resolve().parents[2]
+WORK = Path(os.environ.get("SIGHTLINE_WORK_DIR", REPO / "work"))
 sys.path.insert(0, str(REPO))
 BITS, CELL = 44, 16
 URL_PUB = "rtsp://publisher:pub-local-only@127.0.0.1:8554/Streams/901"
@@ -60,7 +61,7 @@ def now_ms() -> int:
 
 def publish(a):
     import cv2
-    ff = os.environ.get("CAMSIM_FFMPEG", "/mnt/f/models/camsim/bin/ffmpeg")
+    ff = os.environ.get("CAMSIM_FFMPEG", str(WORK / "camsim" / "bin" / "ffmpeg"))
     cap = cv2.VideoCapture(str(REPO / "data/demo/sightline_demo.mp4"))
     fps = 25.0
     p = subprocess.Popen([ff, "-hide_banner", "-loglevel", "warning", "-f", "rawvideo", "-pix_fmt", "bgr24",
@@ -168,7 +169,7 @@ def main():
     ap.add_argument("--uri", default=URL_VIEW)
     ap.add_argument("--udp", action="store_true")
     ap.add_argument("--device", default="cuda:1")
-    ap.add_argument("--data-dir", default="/mnt/f/models/camsim/pipeline_out")
+    ap.add_argument("--data-dir", default=str(WORK / "camsim" / "pipeline_out"))
     a = ap.parse_args()
     {"publish": publish, "ingest": ingest, "pipeline": pipeline}[a.mode](a)
 

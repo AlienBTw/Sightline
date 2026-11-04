@@ -3,7 +3,7 @@
 Windows are ``extract_features.window_starts`` / ``window_indices`` (16 frames,
 step 4, at most 8). Keyframes are the first, middle, and last index of that
 window. JPEGs are longest-side <= 1280 and land in
-``/mnt/f/models/vidlabel/frames/<safe id>/w<k>_<j>.jpg``. An index jsonl records
+``<SIGHTLINE_WORK_DIR>/vidlabel/frames/<safe id>/w<k>_<j>.jpg``. An index jsonl records
 the frame numbers so SAM and Muse label the same windows the encoder will see.
 
   python tools/labeling/sample_frames.py --source ppe_video
@@ -13,10 +13,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
+WORK = Path(os.environ.get("SIGHTLINE_WORK_DIR", REPO / "work"))
 sys.path.insert(0, str(REPO / "training" / "01-data"))
 sys.path.insert(0, str(REPO / "training" / "03-features"))
 sys.path.insert(0, str(REPO / "tools" / "labeling"))
@@ -25,7 +27,7 @@ import extract_features as ef  # noqa: E402
 import ppe_rules  # noqa: E402
 import ppe_video as pv  # noqa: E402
 
-DEFAULT_FRAMES = Path("/mnt/f/models/vidlabel/frames")
+DEFAULT_FRAMES = WORK / "vidlabel" / "frames"
 DEFAULT_PPE = REPO / "training" / "data" / "ppe_video_manifest.jsonl"
 DEFAULT_VOXEL = REPO / "training" / "data" / "manifest.jsonl"
 DEFAULT_WEAK = REPO / "training" / "02-labeling" / "outputs" / "weak_labels_v2_vllm.jsonl"

@@ -12,7 +12,7 @@ Per item we save an uncompressed .npz with
   starts (W,)           int32    first source frame of each window (videos)
 and one JSON line per item in index_r<rank>.jsonl.
 
-Runs in WSL (~/vjepa-venv) with the vjepa2 repo on sys.path. Launch one process
+Runs in WSL with python from your venv and the vjepa2 repo on sys.path. Launch one process
 per GPU with --rank/--world; items are assigned round-robin so shards balance.
 Resume: items whose .npz already exists are skipped.
 
@@ -31,6 +31,8 @@ import time
 from pathlib import Path
 
 TRAINING = Path(__file__).resolve().parents[1]
+REPO = TRAINING.parent
+WORK = Path(os.environ.get("SIGHTLINE_WORK_DIR", REPO / "work"))
 
 # ---- model / sampling constants (V-JEPA 2.1 ViT-L/16, 384) ----
 PATCH = 16
@@ -403,9 +405,9 @@ def run(args):
 
 def build_arg_parser():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default="/mnt/f/sightline_features/vjepa2_1_vitl_384")
-    ap.add_argument("--weights", default=os.path.expanduser("~/models/vjepa/vjepa2_1_vitl_384_encoder_fp16.pt"))
-    ap.add_argument("--vjepa-repo", default=os.path.expanduser("~/vjepa2"))
+    ap.add_argument("--out", default=str(WORK / "features" / "vjepa2_1_vitl_384"))
+    ap.add_argument("--weights", default=str(WORK / "models" / "vjepa" / "vjepa2_1_vitl_384_encoder_fp16.pt"))
+    ap.add_argument("--vjepa-repo", default=str(WORK / "vjepa2"))
     ap.add_argument("--sources", default="voxel51,zenodo",
                     help="comma list; add shwd or ppe_video to extract those manifests (off by default)")
     ap.add_argument("--shwd-manifest", default=str(TRAINING / "data" / "shwd_manifest.jsonl"))

@@ -19,6 +19,8 @@ from pathlib import Path
 import train_head as th
 
 HEAD = Path(__file__).resolve().parent
+REPO = HEAD.parents[1]
+WORK = Path(os.environ.get("SIGHTLINE_WORK_DIR", REPO / "work"))
 FACTORS = ("F2", "F5")
 PEXELS_SPLITS = ("train", "val", "test", "demo_eval")
 HELDOUT_SPLITS = ("test", "demo_eval")
@@ -27,7 +29,7 @@ BOOTSTRAP_RESAMPLES = 1000
 BOOTSTRAP_SEED = 0
 CLIP_SCORE = "sigmoid of the factor logit pooled over every patch of every window"
 WINDOW_SCORE = "max sigmoid(patch evidence) inside the window"
-DEFAULT_JSON = "/mnt/f/models/ppe_eval/shortcut_eval.json"
+DEFAULT_JSON = str(WORK / "ppe_eval" / "shortcut_eval.json")
 DEFAULT_MD = HEAD / "results" / "PPE_SHORTCUT.md"
 
 
@@ -597,8 +599,8 @@ def build_parser():
     parser = argparse.ArgumentParser(description="Pexels-only F2/F5 shortcut metrics for a saved head.")
     parser.add_argument("--checkpoints", default="", help="comma-separated checkpoints; default is h3_wide.pt plus checkpoints/ppe_*.pt")
     parser.add_argument("--ppe-labels", default="data/ppe_video_labels.jsonl")
-    parser.add_argument("--ppe-cache", default="~/sightline_cache/ppe_video_p2")
-    parser.add_argument("--cache", default="~/sightline_cache/vjepa2_1_vitl_384_p2", help="main feature cache used by train_head eval")
+    parser.add_argument("--ppe-cache", default=str(WORK / "cache" / "ppe_video_p2"))
+    parser.add_argument("--cache", default=str(WORK / "cache" / "vjepa2_1_vitl_384_p2"), help="main feature cache used by train_head eval")
     parser.add_argument("--labels", default="02-labeling/outputs/weak_labels_v2_vllm.jsonl", help="weak labels used to build Voxel51 splits")
     parser.add_argument("--gpu", type=int, default=1)
     parser.add_argument("--out-json", default=DEFAULT_JSON)

@@ -1,7 +1,9 @@
 # Judging-uptime watchdog (Nov 4-8). Run every 5 minutes from Task Scheduler (register_tasks.ps1).
 # Restarts the backend after 2 failed /health checks in a row, and restarts ngrok if it died.
 param([int]$Port = 8000, [switch]$NoNgrok)
-$logDir = if ($env:SIGHTLINE_LOG_DIR_WIN) { $env:SIGHTLINE_LOG_DIR_WIN } else { "F:\models\logs" }
+$repo = (Resolve-Path "$PSScriptRoot\..\..").Path
+$work = if ($env:SIGHTLINE_WORK_DIR) { $env:SIGHTLINE_WORK_DIR } else { Join-Path $repo 'work' }
+$logDir = if ($env:SIGHTLINE_LOG_DIR_WIN) { $env:SIGHTLINE_LOG_DIR_WIN } else { Join-Path $work 'logs' }
 New-Item -ItemType Directory -Force $logDir | Out-Null
 $log = Join-Path $logDir "watchdog.log"
 if ((Test-Path $log) -and (Get-Item $log).Length -gt 5MB) { Move-Item -Force $log "$log.1" }

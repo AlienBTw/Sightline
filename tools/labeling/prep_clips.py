@@ -1,6 +1,6 @@
 """Transcode Pexels raw clips to a training size with PyAV.
 
-Writes ``/mnt/f/models/vidlabel/clips/pexels_<id>.mp4``: longest side 1280,
+Writes ``<SIGHTLINE_WORK_DIR>/vidlabel/clips/pexels_<id>.mp4``: longest side 1280,
 about 25 fps (frames are dropped when the source is faster; slower sources are
 not duplicated), at most 30 seconds, H.264. Safe to re-run while downloads are
 still landing: a clip is skipped when the output stamp matches the source size,
@@ -19,10 +19,12 @@ from fractions import Fraction
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-DEFAULT_RAW = Path("/mnt/f/models/vidlabel/pexels")
-DEFAULT_EXTRA = Path("/mnt/f/models/vest_eval/src")
-DEFAULT_OUT = Path("/mnt/f/models/vidlabel/clips")
-DEFAULT_ERRORS = Path("/mnt/f/models/vidlabel/prep_errors.jsonl")
+WORK = Path(os.environ.get("SIGHTLINE_WORK_DIR", REPO / "work"))
+_VID = WORK / "vidlabel"
+DEFAULT_RAW = _VID / "pexels"
+DEFAULT_EXTRA = WORK / "vest_eval" / "src"
+DEFAULT_OUT = _VID / "clips"
+DEFAULT_ERRORS = _VID / "prep_errors.jsonl"
 
 LONG_SIDE = 1280
 FPS_CAP = 25

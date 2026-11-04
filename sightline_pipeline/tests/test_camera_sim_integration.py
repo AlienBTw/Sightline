@@ -1,5 +1,5 @@
 """Integration: real RTSP server (MediaMTX) + real ffmpeg camera -> Sightline ingest.
-Skipped unless the simulator binaries exist ($CAMSIM_BIN, default /mnt/f/models/camsim/bin; fetch them
+Skipped unless the simulator binaries exist ($CAMSIM_BIN, default <repo>/work/camsim/bin; fetch them
 with tools/camera_sim/start_sim.sh). Run:  pytest -m integration sightline_pipeline/tests"""
 import os
 import socket
@@ -11,8 +11,10 @@ import pytest
 
 from sightline_pipeline.ingest import VideoSource
 
-BIN = Path(os.environ.get("CAMSIM_BIN", "/mnt/f/models/camsim/bin"))
-CFG = Path(__file__).resolve().parents[2] / "tools" / "camera_sim" / "mediamtx.yml"
+REPO = Path(__file__).resolve().parents[2]
+WORK = Path(os.environ.get("SIGHTLINE_WORK_DIR", REPO / "work"))
+BIN = Path(os.environ.get("CAMSIM_BIN", WORK / "camsim" / "bin"))
+CFG = REPO / "tools" / "camera_sim" / "mediamtx.yml"
 pytestmark = [pytest.mark.integration,
               pytest.mark.skipif(not ((BIN / "mediamtx").exists() and (BIN / "ffmpeg").exists() and CFG.exists()),
                                  reason="camera simulator binaries not installed")]

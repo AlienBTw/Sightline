@@ -1,7 +1,8 @@
 """Replay held-out clips through the live pipeline and summarize F1, F2 and F5.
 
-Mirrors F:\\models\\logs\\f2_replay.sh, with F5 left live (muted factors are
-F6-F10) and outputs under /mnt/f/models/ppe_eval/<run>/. GPU 1 only
+Mirrors the f2 replay helper. F5 is left live (muted factors are
+F6-F10) and outputs go under ``<SIGHTLINE_WORK_DIR>/ppe_eval/<run>/``
+(work dir default ``<repo>/work``). GPU 1 only
 (CUDA_VISIBLE_DEVICES=1, so the process cuda:0 is that card). Never writes
 data/live and does not talk to the backend on port 8000.
 
@@ -24,7 +25,8 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-EVAL_ROOT = Path("/mnt/f/models/ppe_eval")
+WORK = Path(os.environ.get("SIGHTLINE_WORK_DIR", REPO / "work"))
+EVAL_ROOT = WORK / "ppe_eval"
 FACTORS = ("F1", "F2", "F5")
 DEFAULT_CLIPS = (
     {"id": "sightline_demo", "path": "data/demo/sightline_demo.mp4", "camera_id": "demo"},

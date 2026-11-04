@@ -1,20 +1,27 @@
 # Build the installable Sightline APK locally (Windows). Run from mobile\:
 #   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-apk.ps1 [-DefaultServer https://<name>.ngrok-free.app] [-Clean] [-UniversalOnly]
 # - Generates android\ with `npx expo prebuild` (Continuous Native Generation; android\ is gitignored).
-# - Signs with F:\models\keys\sightline-release.jks. On first run it creates the keystore and a random
-#   password, stored ONLY in F:\models\keys\sightline-release.properties (outside the repo).
-# - Output: F:\sightline_release\sightline.apk (universal) and sightline-arm64.apk (phones only, smaller). Log: F:\models\logs\mobile_build.log (when run detached).
+# - Signs with <work>\keys\sightline-release.jks. On first run it creates the keystore and a random
+#   password, stored ONLY in that folder (work\ is gitignored; override with -KeyDir).
+# - Output: <work>\sightline_release\sightline.apk (universal) and sightline-arm64.apk (phones only, smaller).
+#   Log: <work>\logs\mobile_build.log (when run detached). work\ is <repo>\work, or $env:SIGHTLINE_WORK_DIR.
+#   If the repo path is too long for the native build, set SIGHTLINE_WORK_DIR or -BuildDir to a short folder.
 param(
   [string]$DefaultServer = "",
   [switch]$Clean,
-  [string]$KeyDir = "F:\models\keys",
-  [string]$OutDir = "F:\sightline_release",
-  [string]$BuildDir = "F:\slb",
+  [string]$KeyDir = "",
+  [string]$OutDir = "",
+  [string]$BuildDir = "",
   [switch]$UniversalOnly
 )
 # Native tools write progress to stderr; Windows PowerShell would turn that into terminating errors under
 # "Stop", so failures are detected through $LASTEXITCODE instead.
 $ErrorActionPreference = "Continue"
+$repo = (Resolve-Path "$PSScriptRoot\..\..").Path
+$work = if ($env:SIGHTLINE_WORK_DIR) { $env:SIGHTLINE_WORK_DIR } else { Join-Path $repo 'work' }
+if (-not $KeyDir) { $KeyDir = Join-Path $work 'keys' }
+if (-not $OutDir) { $OutDir = Join-Path $work 'sightline_release' }
+if (-not $BuildDir) { $BuildDir = Join-Path $work 'slb' }
 $mobile = (Resolve-Path "$PSScriptRoot\..").Path
 # The native (CMake/ninja) steps embed the full source path in object paths and fail past Windows'
 # 260-character limit when the repo sits in a long folder. A subst drive doesn't help (Node resolves it back
@@ -45,7 +52,7 @@ $env:PATH = "$env:JAVA_HOME\bin;$env:ANDROID_HOME\platform-tools;$env:PATH"
 Write-Output "JAVA_HOME=$env:JAVA_HOME"
 cmd /c "`"$env:JAVA_HOME\bin\java.exe`" -version 2>&1" | Select-Object -First 1
 
-# Release keystore (outside the repo)
+# Release keystore (under the work dir, gitignored)
 New-Item -ItemType Directory -Force $KeyDir | Out-Null
 $ks = Join-Path $KeyDir "sightline-release.jks"
 $props = Join-Path $KeyDir "sightline-release.properties"

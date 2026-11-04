@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sightline: vLLM in its own venv (keeps the patched ~/sglang-venv untouched). Log: F:\models\logs\vllm_install.log
+# Sightline: vLLM in its own venv (keeps the patched ~/sglang-venv untouched). Log: <repo>/work/logs/vllm_install.log (SIGHTLINE_WORK_DIR, default <repo>/work).
 set -euo pipefail
 export PATH=$HOME/.local/bin:$PATH
 cd ~

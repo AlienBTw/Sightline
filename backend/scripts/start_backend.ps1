@@ -4,7 +4,8 @@ param([string]$Distro = "Ubuntu-24.04", [int]$Port = 8000, [int]$WaitSeconds = 9
 $ErrorActionPreference = "Stop"
 $repo = (Resolve-Path "$PSScriptRoot\..\..").Path
 $wslRepo = "/mnt/" + $repo.Substring(0,1).ToLower() + ($repo.Substring(2) -replace '\\','/')
-$logDir = if ($env:SIGHTLINE_LOG_DIR_WIN) { $env:SIGHTLINE_LOG_DIR_WIN } else { "F:\models\logs" }
+$work = if ($env:SIGHTLINE_WORK_DIR) { $env:SIGHTLINE_WORK_DIR } else { Join-Path $repo 'work' }
+$logDir = if ($env:SIGHTLINE_LOG_DIR_WIN) { $env:SIGHTLINE_LOG_DIR_WIN } else { Join-Path $work 'logs' }
 New-Item -ItemType Directory -Force $logDir | Out-Null
 try { $h = Invoke-RestMethod "http://127.0.0.1:$Port/health" -TimeoutSec 3; Write-Output "already up: $($h.status)"; exit 0 } catch {}
 $p = Start-Process -FilePath "wsl.exe" -WindowStyle Hidden -PassThru `

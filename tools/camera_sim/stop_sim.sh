@@ -2,7 +2,10 @@
 # Stop the camera simulator.  stop_sim.sh            -> everything
 #                             stop_sim.sh pub 101    -> one publisher (simulates the camera dropping off)
 #                             stop_sim.sh server     -> MediaMTX only (simulates the NVR rebooting)
-LOG="${CAMSIM_LOG:-/mnt/f/models/logs/camsim}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "$SCRIPT_DIR/../.." && pwd)"
+WORK="${SIGHTLINE_WORK_DIR:-$REPO/work}"
+LOG="${CAMSIM_LOG:-$WORK/logs/camsim}"
 kill_one() { local f="$LOG/$1.pid"; [[ -f "$f" ]] || return 0; local p; p=$(cat "$f")
   if kill -0 "$p" 2>/dev/null; then kill "$p"; for _ in $(seq 25); do kill -0 "$p" 2>/dev/null || break; sleep 0.2; done
     kill -0 "$p" 2>/dev/null && kill -9 "$p"; echo "stopped $1 (pid $p)"; fi; rm -f "$f"; }

@@ -16,13 +16,14 @@ From the repo root in WSL:
 
 ```bash
 # from the repo root, in WSL
-PY=/home/user/vjepa-venv/bin/python
+# PY=python from your venv
+PY=python
 
 $PY tools/labeling/prep_clips.py
 $PY tools/labeling/build_ppe_manifest.py
 $PY tools/labeling/sample_frames.py --source ppe_video
 $PY tools/labeling/sam_label.py --backend api --dry-run --max-api-calls 0
-/home/user/sam3-venv/bin/python tools/labeling/sam_label.py --backend local --gpu 1
+$PY tools/labeling/sam_label.py --backend local --gpu 1
 $PY tools/labeling/muse_verify.py --dry-run --max-calls 2
 $PY tools/labeling/merge_labels.py
 ```

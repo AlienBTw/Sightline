@@ -2,7 +2,7 @@
 
 Copies of the helper scripts that ran stage 1 labelling on the training PC (Oct 31, 2026): local Muse Glimmer 30B 4-bit (`RedHatAI/Muse-Glimmer-30B-INT4`, Apache 2.0) served with vLLM, tensor parallel, as `muse-glimmer-30b-int4-vllm`. SGLang scripts in this folder are an earlier attempt. No secrets are used or stored, and no token is needed.
 
-The scripts contain machine-specific weight, log, and WSL paths. Edit those paths before you run them somewhere else. `~/vllm-venv` and `~/sglang-venv` are the WSL environments used on the training PC (WSL2 Ubuntu-24.04).
+Weights, logs, and the Hugging Face cache default under `SIGHTLINE_WORK_DIR` (`<repo>/work` when unset). `~/vllm-venv` and `~/sglang-venv` are the WSL environments the install scripts create.
 
 | Script | Runs in | What it does |
 |---|---|---|
@@ -16,12 +16,12 @@ The scripts contain machine-specific weight, log, and WSL paths. Edit those path
 | `cudafix.sh` | WSL | Makes the pip CUDA toolkit (`nvidia/cu13`, nvcc 13.4) usable as `CUDA_HOME` for SGLang's JIT kernels (symlinks `lib64`, `libcudart.so`, the `libcuda.so` stub). |
 | `patch_symm.sh` | WSL | Patches SGLang's multimem logits all-gather (`triton_symm_mem_ag.py`) to fall back to NCCL when `SGLANG_DISABLE_MULTIMEM_AG=1`, because it crashed with SIGFPE on 2x3090 under WSL. It keeps a `.orig` copy, and a reinstall drops the patch. |
 | `serve_sglang.sh` | WSL | SGLang server, TP=2, port 30000, triton attention, PyTorch sampler, CUDA graphs off, custom all-reduce off. |
-| `copy_and_serve.sh` | WSL | Copies the weights onto the WSL ext4 filesystem once (loading went from ~200 s to 21 s), then starts SGLang. Edit the source path in the script. |
+| `copy_and_serve.sh` | WSL | Copies the weights into the work dir when `MODEL_PATH` points somewhere else, then starts SGLang. |
 | `stop_sglang.sh` | WSL | Stops SGLang. This copy matches by process name; the original used a hard-coded PID. |
 
 ## Reproduce the full run
 
-Edit the weight directory, log directory, and WSL paths inside the scripts first. The server is tensor parallel across both GPUs and serves `muse-glimmer-30b-int4-vllm`.
+Set `SIGHTLINE_WORK_DIR` if weights and logs should not live in `<repo>/work`. The server is tensor parallel across both GPUs and serves `muse-glimmer-30b-int4-vllm`.
 
 ```powershell
 # 1. Weights (once)

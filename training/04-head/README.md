@@ -3,7 +3,7 @@
 **Goal:** a small head on frozen V-JEPA 2.1 features that predicts the hazard factors (F1-F10) as named concepts, each with its own spatial map, so every alert is explained by factors and can be circled in the frame. The risk score (noisy-OR prior in `configs/factors.yaml`) and F11 (anomaly from V-JEPA prediction error) come later.
 
 ## Inputs
-- Features from 03 (the `vjepa2_1_vitl_384` directory outside the repo), pooled 2x2 into a 12 x 21 grid per window (252 tokens x 1024) by `train_head.py cache` -> one fp16 memmap in WSL `~/sightline_cache/vjepa2_1_vitl_384_p2` (9,587 items, 11,113 windows, ~5.7 GB; built in 9.5 min).
+- Features from 03 (`<SIGHTLINE_WORK_DIR>/features/vjepa2_1_vitl_384`), pooled 2x2 into a 12 x 21 grid per window (252 tokens x 1024) by `train_head.py cache` -> one fp16 memmap in `<SIGHTLINE_WORK_DIR>/cache/vjepa2_1_vitl_384_p2` (9,587 items, 11,113 windows, ~5.7 GB; built in 9.5 min). Work dir default is `<repo>/work`.
 - Labels:
   | Factor | Voxel51 source | Zenodo |
   |---|---|---|

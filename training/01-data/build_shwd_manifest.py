@@ -23,11 +23,14 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
 TRAINING = Path(__file__).resolve().parents[1]
+REPO = TRAINING.parent
+WORK = Path(os.environ.get("SIGHTLINE_WORK_DIR", REPO / "work"))
 SPLITS = ("train", "validation", "test")
 IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG")
 
@@ -268,7 +271,7 @@ def format_counts(rows: list[dict]) -> str:
 
 def build_arg_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--root", default="/mnt/f/datasets/shwd",
+    ap.add_argument("--root", default=str(WORK / "datasets" / "shwd"),
                     help="SHWD root (the folder that contains VOC2028/) or the VOC2028 folder itself")
     ap.add_argument("--out", default=str(TRAINING / "data" / "shwd_manifest.jsonl"))
     ap.add_argument("--max-train", type=int, default=3000,

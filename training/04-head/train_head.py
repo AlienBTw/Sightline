@@ -36,7 +36,7 @@ Labels:
     has its own non-null F2/F5 label (--ppe-window-weight, default 0.5), so a
     frame with no bare head inside a present clip is not forced positive.
     SHWD box targets need the cache that contains shwd rows
-    (~/sightline_cache/vjepa2_1_vitl_384_p2_shwd); that cache combines with
+    (``<SIGHTLINE_WORK_DIR>/cache/vjepa2_1_vitl_384_p2_shwd``); that cache combines with
     --ppe-cache.
 
 Subcommands:
@@ -55,6 +55,10 @@ import time
 from pathlib import Path
 
 TRAINING = Path(__file__).resolve().parents[1]
+REPO = TRAINING.parent
+WORK = Path(os.environ.get("SIGHTLINE_WORK_DIR", REPO / "work"))
+DEFAULT_FEATURES = str(WORK / "features" / "vjepa2_1_vitl_384")
+DEFAULT_CACHE = str(WORK / "cache" / "vjepa2_1_vitl_384_p2")
 FACTORS = [f"F{i}" for i in range(1, 11)]
 GLIMMER_FACTORS = ["F1", "F2", "F3", "F4", "F5", "F6", "F10"]
 HINT_FACTORS = ["F7", "F8", "F9"]
@@ -624,7 +628,7 @@ def apply_train_sources(meta, use_zenodo=1, f2_box_source="", shwd_rows=None,
             raise SystemExit(
                 f"--f2-box-source shwd but the cache has no shwd rows{where}. "
                 "Extract SHWD features and rebuild the cache (use a new --cache path "
-                "such as ~/sightline_cache/vjepa2_1_vitl_384_p2_shwd)."
+                "such as <SIGHTLINE_WORK_DIR>/cache/vjepa2_1_vitl_384_p2_shwd)."
             )
         by_id = {m["id"]: m for m in (shwd_rows or [])}
         for r in meta:
@@ -1771,8 +1775,8 @@ def build_arg_parser():
     ap = argparse.ArgumentParser()
     sp = ap.add_subparsers(dest="cmd", required=True)
     c = sp.add_parser("cache")
-    c.add_argument("--features", default="/mnt/f/sightline_features/vjepa2_1_vitl_384")
-    c.add_argument("--cache", default="~/sightline_cache/vjepa2_1_vitl_384_p2")
+    c.add_argument("--features", default=DEFAULT_FEATURES)
+    c.add_argument("--cache", default=DEFAULT_CACHE)
     c.add_argument("--labels", default="02-labeling/outputs/weak_labels_v2_vllm.jsonl")
     c.add_argument("--zenodo-train-stride", type=int, default=2)
     c.add_argument("--shwd-manifest", default="data/shwd_manifest.jsonl",
@@ -1781,7 +1785,7 @@ def build_arg_parser():
                    help="comma list of feature sources to cache; empty keeps every row in the root index")
     c.add_argument("--out", default="", help="cache directory; overrides --cache when set")
     t = sp.add_parser("train")
-    t.add_argument("--cache", default="~/sightline_cache/vjepa2_1_vitl_384_p2")
+    t.add_argument("--cache", default=DEFAULT_CACHE)
     t.add_argument("--labels", default="02-labeling/outputs/weak_labels_v2_vllm.jsonl")
     t.add_argument("--name", default="")
     t.add_argument("--gpu", type=int, default=0)
@@ -1865,7 +1869,7 @@ def _add_ppe_args(p):
 
 def _add_eval_data_args(p):
     """Same data-policy defaults as train, so an eval of h3_wide reproduces its splits."""
-    p.add_argument("--cache", default="~/sightline_cache/vjepa2_1_vitl_384_p2")
+    p.add_argument("--cache", default=DEFAULT_CACHE)
     p.add_argument("--labels", default="02-labeling/outputs/weak_labels_v2_vllm.jsonl")
     p.add_argument("--gpu", type=int, default=0)
     p.add_argument("--seed", type=int, default=0)

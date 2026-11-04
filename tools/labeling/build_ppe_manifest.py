@@ -11,16 +11,18 @@ bare-head grinder extra and the stitched demo video).
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
+WORK = Path(os.environ.get("SIGHTLINE_WORK_DIR", REPO / "work"))
 sys.path.insert(0, str(REPO / "training" / "01-data"))
 
 import ppe_video as pv  # noqa: E402
 
-DEFAULT_CLIPS = Path("/mnt/f/models/vidlabel/clips")
-DEFAULT_URLS = Path("/mnt/f/models/vidlabel/pexels_urls.txt")
+DEFAULT_CLIPS = WORK / "vidlabel" / "clips"
+DEFAULT_URLS = WORK / "vidlabel" / "pexels_urls.txt"
 DEFAULT_OUT = REPO / "training" / "data" / "ppe_video_manifest.jsonl"
 DEFAULT_DEMO = REPO / "training" / "data" / "ppe_demo_eval.jsonl"
 DEMO_EXTRA = REPO / "data" / "demo_extra" / "pexels_8987012_bare_head_grinder.mp4"

@@ -5,7 +5,9 @@ param([int]$Port = 8000)
 $ngrok = (Get-Command ngrok -ErrorAction SilentlyContinue).Source
 if (-not $ngrok) { Write-Output "ngrok not found on PATH (winget install ngrok.ngrok)"; exit 1 }
 if (Get-Process ngrok -ErrorAction SilentlyContinue) { Write-Output "ngrok already running"; exit 0 }
-$logDir = if ($env:SIGHTLINE_LOG_DIR_WIN) { $env:SIGHTLINE_LOG_DIR_WIN } else { "F:\models\logs" }
+$repo = (Resolve-Path "$PSScriptRoot\..\..").Path
+$work = if ($env:SIGHTLINE_WORK_DIR) { $env:SIGHTLINE_WORK_DIR } else { Join-Path $repo 'work' }
+$logDir = if ($env:SIGHTLINE_LOG_DIR_WIN) { $env:SIGHTLINE_LOG_DIR_WIN } else { Join-Path $work 'logs' }
 $log = Join-Path $logDir "ngrok.log"
 if ((Test-Path $log) -and (Get-Item $log).Length -gt 20MB) { Move-Item -Force $log "$log.1" }
 $nargs = @("http", "$Port", "--log", $log, "--log-format", "json")

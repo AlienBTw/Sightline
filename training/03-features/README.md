@@ -7,8 +7,8 @@
 - **License: MIT** (repo `LICENSE`; the hub code that loads these checkpoints is MIT-headered). Any-purpose use is allowed with the copyright notice.
 - Source: `https://dl.fbaipublicfiles.com/vjepa2/vjepa2_1_vitl_dist_vitG_384.pt` (5.15 GB, includes predictor + optimizer state). Meta has **not** put 2.1 on Hugging Face yet (vjepa2 issue #137 still open; only community re-uploads exist), so we used the official file. Note: on `main`, `src/hub/backbones.py` points `VJEPA_BASE_URL` at `localhost:8300`, so `torch.hub.load(...)` does not download; we fetch the URL directly and load the encoder ourselves.
 - Why ViT-L: ViT-B is the live/edge candidate, ViT-g/G (1-2 B) would be 3-7x slower for offline extraction. ViT-L is the best quality per second on a 3090 and needs only ~2.6 GiB of allocated VRAM at our batch sizes.
-- `convert_checkpoint.py` keeps only the `ema_encoder` weights (what the official hub loader uses), fp16: `vjepa2_1_vitl_384_encoder_fp16.pt` (609 MB), kept with the raw checkpoint outside the repo and under `~/models/vjepa/` in WSL. The raw 5.15 GB file stays in WSL `~/models/vjepa/`.
-- Repo code: `~/vjepa2` (WSL clone of `main`), imported for `app.vjepa_2_1.models.vision_transformer.vit_large` with the hub settings (RoPE, `img_temporal_dim_size=1`, `interpolate_rope=True`).
+- `convert_checkpoint.py` keeps only the `ema_encoder` weights (what the official hub loader uses), fp16: `vjepa2_1_vitl_384_encoder_fp16.pt` (609 MB), kept with the raw checkpoint under `<SIGHTLINE_WORK_DIR>/models/vjepa/` (default `<repo>/work`). The raw 5.15 GB file stays there too.
+- Repo code: `<SIGHTLINE_WORK_DIR>/vjepa2` (clone of `main`), imported for `app.vjepa_2_1.models.vision_transformer.vit_large` with the hub settings (RoPE, `img_temporal_dim_size=1`, `interpolate_rope=True`).
 
 ## Sampling and outputs
 | | Videos (Voxel51) | Images (Zenodo) |
@@ -22,14 +22,14 @@
 
 - Normalization: ImageNet mean/std, fp32 weights under fp16 autocast (pure `.half()` fails: the RoPE path produces fp32 q/k).
 - One `.npz` per item, named by a stable hash key (`item_key()`), plus `index_r<rank>.jsonl` rows (id, split, windows, starts) and `errors_r<rank>.jsonl`.
-- Output: `vjepa2_1_vitl_384/{voxel51,zenodo}/` outside the repo (not in git; bulk arrays stay off the system drive).
+- Output: `<SIGHTLINE_WORK_DIR>/features/vjepa2_1_vitl_384/{voxel51,zenodo}/` (default `<repo>/work`; gitignored).
 - Voxel51 items are the **658 de-duplicated clips** from the weak-label file (one row per byte-identical group), so no clip can appear in both train and test. Zenodo items: Train/Validation/Test (12,183). Augmentation (a copy of Train) and Inpaint (no labels) are skipped.
 
 ## How to run
 WSL env `~/vjepa-venv` (Python 3.12). To avoid a second 3 GB CUDA download it re-uses the PyTorch 2.13 + cu132 stack of `~/vllm-venv` through a `.pth` file and adds `timm`, `scikit-learn`, `scipy`, `narwhals`, `pytest` on top (`--no-deps`).
 ```bash
 source ~/vjepa-venv/bin/activate
-python convert_checkpoint.py ~/models/vjepa/vjepa2_1_vitl_dist_vitG_384.pt ~/models/vjepa/vjepa2_1_vitl_384_encoder_fp16.pt
+python convert_checkpoint.py "$SIGHTLINE_WORK_DIR/models/vjepa/vjepa2_1_vitl_dist_vitG_384.pt" "$SIGHTLINE_WORK_DIR/models/vjepa/vjepa2_1_vitl_384_encoder_fp16.pt"
 python extract_features.py --limit 10 --out <feature-dir>/smoke                    # smoke test
 bash scripts/run_extract.sh                                                         # 2 detached ranks, one per GPU
 powershell -File scripts/check_extract.ps1                                          # status (Windows)

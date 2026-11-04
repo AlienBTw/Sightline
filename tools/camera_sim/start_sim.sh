@@ -4,13 +4,15 @@
 #   bash tools/camera_sim/start_sim.sh pub 101    # (re)start one publisher, e.g. after a disconnect test
 #   bash tools/camera_sim/start_sim.sh server     # only the RTSP server
 # Viewer URL:  rtsp://admin:Sightline2026@<host>:8554/Streams/101   (see README.md for the stream list)
-# Binaries:    $CAMSIM_BIN (default /mnt/f/models/camsim/bin), downloaded on first run.
-# Logs + PIDs: $CAMSIM_LOG (default /mnt/f/models/logs/camsim).
+# Binaries:    $CAMSIM_BIN (default <repo>/work/camsim/bin), downloaded on first run.
+# Logs + PIDs: $CAMSIM_LOG (default <repo>/work/logs/camsim).
 set -euo pipefail
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="$(cd "$HERE/../.." && pwd)"
-BIN="${CAMSIM_BIN:-/mnt/f/models/camsim/bin}"
-LOG="${CAMSIM_LOG:-/mnt/f/models/logs/camsim}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "$SCRIPT_DIR/../.." && pwd)"
+WORK="${SIGHTLINE_WORK_DIR:-$REPO/work}"
+HERE="$SCRIPT_DIR"
+BIN="${CAMSIM_BIN:-$WORK/camsim/bin}"
+LOG="${CAMSIM_LOG:-$WORK/logs/camsim}"
 PORT="${CAMSIM_PORT:-8554}"
 PUB="rtsp://publisher:pub-local-only@127.0.0.1:$PORT"
 DEMO="${CAMSIM_DEMO:-$REPO/data/demo/sightline_demo.mp4}"

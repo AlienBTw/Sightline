@@ -12,10 +12,12 @@ window inherits the clip label and has no boxes.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
+WORK = Path(os.environ.get("SIGHTLINE_WORK_DIR", REPO / "work"))
 sys.path.insert(0, str(REPO / "training" / "01-data"))
 sys.path.insert(0, str(REPO / "tools" / "labeling"))
 
@@ -25,9 +27,10 @@ import ppe_video as pv  # noqa: E402
 DEFAULT_PPE = REPO / "training" / "data" / "ppe_video_manifest.jsonl"
 DEFAULT_VOXEL = REPO / "training" / "data" / "manifest.jsonl"
 DEFAULT_WEAK = REPO / "training" / "02-labeling" / "outputs" / "weak_labels_v2_vllm.jsonl"
-DEFAULT_SAM = Path("/mnt/f/models/vidlabel/sam_windows.jsonl")
-DEFAULT_MUSE = Path("/mnt/f/models/vidlabel/muse_verdicts.jsonl")
-DEFAULT_INDEX = Path("/mnt/f/models/vidlabel/frames/index.jsonl")
+_VID = WORK / "vidlabel"
+DEFAULT_SAM = _VID / "sam_windows.jsonl"
+DEFAULT_MUSE = _VID / "muse_verdicts.jsonl"
+DEFAULT_INDEX = _VID / "frames" / "index.jsonl"
 DEFAULT_OUT = REPO / "training" / "data" / "ppe_video_labels.jsonl"
 
 

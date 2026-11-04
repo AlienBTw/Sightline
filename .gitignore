@@ -8,6 +8,9 @@
 # Local progress trackers (not for GitHub)
 progress/
 
+# Local work tree for models, features, logs, and datasets (SIGHTLINE_WORK_DIR)
+work/
+
 # Personal progress notes (local only; README.md files stay tracked)
 JOURNAL.md
 **/JOURNAL.md
