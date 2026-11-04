@@ -12,12 +12,12 @@ Built with Expo SDK 58 (React Native 0.88, TypeScript, expo-router). Android onl
 | **Cameras** | A grid of cameras with a snapshot, a state badge and live hazard chips. You can start or stop a camera, upload a video (it becomes a looping virtual camera), and, as admin, add an RTSP camera or long-press to delete one. |
 | **Live view** | The backend's low-bandwidth MJPEG stream (1 fps, 480 px) with the circles drawn on the server, live hazard chips, and that camera's recent alerts. A viewing session lasts about 5 minutes, then "Keep watching" resumes it, to save ngrok bandwidth. |
 | **Alerts** | A real-time feed over WebSocket, with status and factor filters, risk colours, thumbnails and pagination. |
-| **Event detail** | Plays the annotated clip (`clip_circles.mp4`), or the original clip with circles drawn by the app in sync with playback. Shows each factor in plain words with its time segments, the SAM 3.1 / Muse Spark escalation verdict, and the action history. You can acknowledge, dismiss or reopen it. |
+| **Event detail** | Plays the annotated clip (`clip_circles.mp4`), or the original clip with circles drawn by the app in sync with playback. Shows each factor in plain words with its time segments, the SAM 3.1 / Muse Spark escalation verdict, the F2/F5 verification badge (`Verified by Muse Spark (3/3 frames)`, `Not confirmed`, `Skipped: API limit`, `Check failed`), and the action history. You can acknowledge, dismiss or reopen it. |
 | **Settings** | Account, server, connection state, backend health, notification status, a test notification, sign out, and a legend of the hazard factors. |
 
 Tapping a notification opens the event, after sign-in if needed.
 
-**Experimental factors:** in live testing only hand-in-danger-zone (F1) detections held up. Every other factor is marked *experimental* in chips, alert rows, notifications and the event page, and F1 wins the headline when an event has both. This is display only; the backend thresholds are unchanged.
+**Experimental factors:** in live testing only hand-in-danger-zone (F1) detections held up from the head alone. F2 (no head protection) and F5 (no hi-vis vest) reach the app only after Muse Spark confirmed them, and their event page shows the verification badge. Every factor other than F1 still carries the *experimental* tag in chips, alert rows, notifications and the event page, and F1 wins the headline when an event has both. This is display only; the backend thresholds are unchanged.
 
 ## Security
 

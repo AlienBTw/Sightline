@@ -4,12 +4,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ClipPlayer } from '../../components/ClipPlayer';
 import { Button, Card, ErrorState, FactorChip, Loading, RiskBadge, StatusPill, Txt } from '../../components/ui';
-import { EXPERIMENTAL_NOTE, factorInfo, headlineFactor, isExperimental, visibleFactors } from '../../lib/factors';
+import { EXPERIMENTAL_NOTE, factorInfo, headlineFactor, isExperimental, verifyBadge, visibleFactors } from '../../lib/factors';
 import { clock, timeAgo } from '../../lib/format';
 import { useRealtime } from '../../lib/realtime';
 import { useApi } from '../../lib/session';
 import { C, FONT, R, S } from '../../lib/theme';
-import type { EscalationCall, EventDetail, EventStatus } from '../../lib/types';
+import type { EscalationBudget, EscalationCall, EventDetail, EventStatus } from '../../lib/types';
 import { absUrl } from '../../lib/url';
 import { errMsg, useAsync } from '../../lib/useAsync';
 
@@ -65,13 +65,18 @@ export default function EventScreen() {
   if (!d) return null;
 
   const head = headlineFactor(d.top_factor, d.factors);
-  const factors = visibleFactors(d.factors);
+  const gates = d.escalation?.verify_gates?.factors ?? {};
+  const factors = visibleFactors(Array.from(new Set([...d.factors, ...Object.keys(gates)])));
   const camName = cams.data?.items.find((c) => c.id === d.camera_id)?.name ?? d.camera_id;
   const [cw, ch] = d.clip_size ?? [960, 540];
   const useMode: Mode = (mode ?? 'annotated') === 'annotated' && circlesReady ? 'annotated' : 'overlay';
   const clipUrl = useMode === 'annotated' ? d.media.clip_circles.url : d.media.clip.url;
   const clipReady = useMode === 'annotated' ? circlesReady : d.media.clip.ready;
   const calls = (d.escalation?.calls ?? []).filter((c) => !factorInfo(c.factor).hidden);
+  const budget = d.escalation?.budget;
+  const skippedBudget = (d.escalation?.skipped ?? []).filter(
+    (s) => s.status === 'skipped_budget' && !factorInfo(s.factor).hidden,
+  );
   const dur = d.ended_at ? Math.max(0, (Date.parse(d.ended_at) - Date.parse(d.started_at)) / 1000) : null;
 
   return (
@@ -166,10 +171,13 @@ export default function EventScreen() {
           <Txt variant="label">What was flagged</Txt>
           {factors.map((f) => {
             const seg = d.segments?.find((s) => s.factor === f);
+            const badge = verifyBadge(gates[f]);
+            const confirmed = gates[f]?.status === 'confirmed';
             return (
               <View key={f} style={{ gap: 4 }}>
-                <FactorChip id={f} showMuted />
+                <FactorChip id={f} showMuted={!!factorInfo(f).muted && !confirmed} />
                 <Txt variant="muted">{factorInfo(f).plain}</Txt>
+                {badge ? <Txt variant="small">{badge}</Txt> : null}
                 {seg ? (
                   <Txt variant="small">
                     Seen for {(seg.end_s - seg.start_s).toFixed(1)} s
@@ -192,11 +200,16 @@ export default function EventScreen() {
             <Ionicons name="sparkles" size={14} color={C.accent} />
             <Txt variant="label">Second opinion (Meta SAM 3.1 + Muse Spark)</Txt>
           </View>
-          {calls.length ? (
-            calls.map((c, i) => <Escalation key={`${c.factor}-${i}`} call={c} />)
-          ) : (
+          {calls.map((c, i) => <Escalation key={`${c.factor}-${i}`} call={c} />)}
+          {skippedBudget.map((s, i) => (
+            <View key={`skip-${s.factor}-${i}`} style={styles.esc}>
+              <FactorChip id={s.factor} />
+              <Txt variant="small">{budgetSkipLine(s.reason, budget)}</Txt>
+            </View>
+          ))}
+          {!calls.length && !skippedBudget.length ? (
             <Txt variant="muted">Not needed: the model was confident about this one.</Txt>
-          )}
+          ) : null}
         </Card>
 
         {d.actions?.length ? (
@@ -229,6 +242,17 @@ function samText(s?: { status: string }) {
     default:
       return `SAM 3.1: ${s?.status}`;
   }
+}
+
+function budgetSkipLine(reason: string | undefined, budget?: EscalationBudget) {
+  if (reason === 'incident_cap') return 'Meta API check skipped: incident limit';
+  if (reason === 'minute_cap' || reason === 'rate_limited') return 'Meta API check skipped: per-minute limit';
+  const daily = reason === 'daily_cap';
+  const used = daily ? budget?.day_used : budget?.session_used;
+  const max = daily ? budget?.day_max : budget?.session_max;
+  const which = daily ? 'daily budget' : 'session budget';
+  const frac = typeof used === 'number' && typeof max === 'number' ? ` (${used}/${max})` : '';
+  return `Meta API check skipped: ${which}${frac}`;
 }
 
 function Escalation({ call }: { call: EscalationCall }) {

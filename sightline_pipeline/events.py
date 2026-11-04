@@ -120,6 +120,35 @@ class IncidentTracker:
                 out.extend(self._close(t))
         return out
 
+    def note_gate_factor(self, t: float, factor: str, score: float, threshold: float, active: bool) -> list[tuple]:
+        """Attach a factor the mute list would ignore. Used by the F2 and F5 verify gates.
+
+        `active` is the caller's hysteresis. This does not change `muted`. Call it after
+        `update` on the same timestamp: `update` still sees the open segment, so the
+        incident stays open while the gate factor is on and can close on a later step.
+        """
+        out = []
+        if active:
+            if self.current is None:
+                self.current = Incident(self._next_id, start=t, last_on=t)
+                self._next_id += 1
+                out.append(("open", self.current))
+            seg = self._open_seg.get(factor)
+            if seg is None:
+                seg = Segment(factor, start=t, peak=score, peak_t=t, threshold=threshold)
+                self.current.segments.append(seg)
+                self._open_seg[factor] = seg
+                out.append(("gate_on", self.current, seg))
+            elif score > seg.peak:
+                seg.peak, seg.peak_t = score, t
+            self.current.last_on = t
+        else:
+            seg = self._open_seg.pop(factor, None)
+            if seg is not None and self.current is not None:
+                seg.end = t
+                out.append(("gate_off", self.current, seg))
+        return out
+
     def _close(self, t: float) -> list[tuple]:
         inc = self.current
         for f, seg in list(self._open_seg.items()):

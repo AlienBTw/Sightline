@@ -36,7 +36,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       setCameraFactors(Object.fromEntries(m.cameras.map((c) => [c.camera_id, c.active_factors ?? []])));
     } else if (m.type === 'alert_state') {
       setCameraFactors((prev) => ({ ...prev, [m.camera_id]: m.factors ?? [] }));
-    } else if (m.type === 'event' && isAlerting(m.event?.factors)) {
+    } else if (m.type === 'event' && isAlerting(m.event?.factors, m.event?.verified_by)) {
       void notifyNewEvent(m.event, AppState.currentState === 'active');
     }
     listeners.current.forEach((l) => {

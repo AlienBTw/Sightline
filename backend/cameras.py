@@ -149,6 +149,10 @@ class CameraWorker(threading.Thread):
             self._set("loading_model")
             model = self.pool.acquire(self.device)
             pipe = self.factory.make_pipeline(model)
+            # Fresh session for this camera start. Looped replays and reconnects keep it.
+            reset_session = getattr(getattr(pipe, "escalator", None), "reset_session", None)
+            if reset_session is not None:
+                reset_session()
             backoff = 2.0
             while not self.stop_ev.is_set():
                 kind = self.cam["kind"]

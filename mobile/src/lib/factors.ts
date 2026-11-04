@@ -1,14 +1,25 @@
 // Plain-language names for the 11 hazard factors (training/configs/factors.yaml).
-// F3/F4 have no usable training labels -> hidden in the app. F2/F5 are scored but muted (no alerts).
-// Only F1 held up in live testing; every other factor is labelled "experimental" in the UI (display only,
-// the backend thresholds are unchanged).
+// F3/F4 have no usable training labels -> hidden in the app. F2/F5 are scored, then published
+// only after Muse Spark confirms them. Only F1 held up in live testing; every other factor is
+// labelled "experimental" in the UI (display only, the backend thresholds are unchanged).
 
 export interface FactorInfo {
   id: string;
   name: string;
   plain: string;
+  /** Circle / chip colour. F2 amber, F5 teal, matching the Sightline palette. */
+  color?: string;
   hidden?: boolean;
   muted?: boolean;
+}
+
+export interface VerifyFactorStatus {
+  status?: string;
+  votes?: number;
+  n_frames?: number;
+  reason?: string;
+  verified_by?: string | null;
+  circle_source?: string;
 }
 
 /** Factors whose live detections were verified as reliable. */
@@ -23,10 +34,10 @@ export const EXPERIMENTAL_NOTE =
 
 export const FACTORS: FactorInfo[] = [
   { id: 'F1', name: 'Hand in danger zone', plain: "A hand or arm is reaching into a machine's danger zone." },
-  { id: 'F2', name: 'No head protection', plain: 'Someone is not wearing a hard hat where one is needed.', muted: true },
+  { id: 'F2', name: 'No head protection', plain: 'Someone is not wearing a hard hat where one is needed.', muted: true, color: '#c45c26' },
   { id: 'F3', name: 'No eye/face protection', plain: 'No safety glasses or face shield near a machine.', hidden: true },
   { id: 'F4', name: 'Wrong glove state', plain: 'Gloves are wrong for the task near machinery.', hidden: true },
-  { id: 'F5', name: 'No hi-vis vest', plain: 'Someone is not wearing hi-vis near vehicle traffic.', muted: true },
+  { id: 'F5', name: 'No hi-vis vest', plain: 'Someone is not wearing hi-vis near vehicle traffic.', muted: true, color: '#0f766e' },
   { id: 'F6', name: 'Fall or slip', plain: 'A person is falling, slipping or lying on the floor.' },
   { id: 'F7', name: 'Unstable load', plain: 'A carried or stacked load looks unstable or overloaded.' },
   { id: 'F8', name: 'Person in vehicle path', plain: 'A person is off the walkway or in a forklift path.' },
@@ -48,9 +59,30 @@ export function visibleFactors(ids: string[] | undefined | null): string[] {
   return (ids ?? []).filter((id) => !BY_ID[id]?.hidden);
 }
 
-/** True if the event should raise an alert (it has at least one factor that is neither hidden nor muted). */
-export function isAlerting(ids: string[] | undefined | null): boolean {
-  return (ids ?? []).some((id) => !BY_ID[id]?.hidden && !BY_ID[id]?.muted);
+const GATED = new Set(['F2', 'F5']);
+
+/** Badge for a Muse Spark verify-gate result. */
+export function verifyBadge(factor?: VerifyFactorStatus | null): string | null {
+  if (!factor?.status) return null;
+  if (factor.status === 'confirmed') {
+    const votes = factor.votes ?? 0;
+    const frames = factor.n_frames ?? 0;
+    return `Verified by Muse Spark (${votes}/${frames} frames)`;
+  }
+  if (factor.status === 'rejected') return 'Not confirmed';
+  if (factor.status === 'skipped_budget') return 'Skipped: API limit';
+  if (factor.status === 'failed' || factor.status === 'skipped_no_key') return 'Check failed';
+  return null;
+}
+
+/** True if the event should raise an alert (it has at least one factor that is neither hidden nor muted).
+ *  F2 and F5 stay muted unless Muse Spark verified the event. */
+export function isAlerting(ids: string[] | undefined | null, verifiedBy?: string | null): boolean {
+  return (ids ?? []).some((id) => {
+    if (BY_ID[id]?.hidden) return false;
+    if (GATED.has(id)) return !!verifiedBy;
+    return !BY_ID[id]?.muted;
+  });
 }
 
 /** Pick the factor to headline an event with, preferring the server's top factor if it is visible. */

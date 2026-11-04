@@ -33,6 +33,20 @@ def summary(c: Ctx, row: dict, user: User | None) -> dict:
            "top_factor_label": FACTOR_LABELS.get(row.get("top_factor") or "", None), "factors": factors,
            "factor_labels": {f: FACTOR_LABELS.get(f, f) for f in factors}, "status": row.get("status") or "open",
            "escalated": bool(row.get("escalated")) if "escalated" in row else bool((row.get("escalation") or {}).get("calls"))}
+    verified = row.get("verified_by")
+    if not verified:
+        esc = row.get("escalation") if isinstance(row.get("escalation"), dict) else {}
+        gates = esc.get("verify_gates") if isinstance(esc.get("verify_gates"), dict) else {}
+        for fac in (gates.get("factors") or {}).values():
+            if isinstance(fac, dict) and fac.get("verified_by"):
+                verified = fac.get("verified_by")
+                break
+        if not verified:
+            legacy = esc.get("f5_vlm_gate") if isinstance(esc.get("f5_vlm_gate"), dict) else None
+            if isinstance(legacy, dict):
+                verified = legacy.get("verified_by")
+    if verified:
+        out["verified_by"] = verified
     if user is not None:
         out["thumb_url"] = signed(c, user, f"/api/events/{eid}/", f"/api/events/{eid}/thumb.jpg")
     return out

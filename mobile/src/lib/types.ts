@@ -75,6 +75,8 @@ export interface EventSummary {
   status: EventStatus;
   escalated: boolean;
   thumb_url?: string;
+  /** Set when Muse Spark confirmed an F2 or F5 verify gate. */
+  verified_by?: string | null;
 }
 
 export interface EventList {
@@ -130,6 +132,20 @@ export interface EscalationCall {
   final_circle?: { source?: string } | null;
 }
 
+export interface EscalationSkip {
+  factor: string;
+  t?: number;
+  reason?: string;
+  status?: string;
+}
+
+export interface EscalationBudget {
+  session_used?: number;
+  session_max?: number;
+  day_used?: number;
+  day_max?: number;
+}
+
 export interface MediaRef {
   url: string;
   ready: boolean;
@@ -141,6 +157,22 @@ export interface EventDetail extends EventSummary {
   escalation?: {
     backends?: Record<string, unknown>;
     calls?: EscalationCall[];
+    skipped?: EscalationSkip[];
+    budget?: EscalationBudget;
+    verify_gates?: {
+      factors?: Record<string, {
+        status?: 'confirmed' | 'rejected' | 'failed' | 'skipped_budget' | 'skipped_no_key' | string;
+        votes?: number;
+        n_frames?: number;
+        reason?: string;
+        verified_by?: string | null;
+        circle_source?: string;
+        sam_status?: string;
+      }>;
+      api_calls?: { muse?: number; sam?: number };
+      suppressed?: string[];
+      raw?: string | null;
+    } | null;
   } | null;
   clip_size?: [number, number];
   clip_fps?: number;

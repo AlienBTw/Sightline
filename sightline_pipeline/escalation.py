@@ -7,6 +7,20 @@ Policy (EscalationPolicy, pure): when a factor turns on inside an incident, esca
     (default 1.0-1.6x the threshold),
 capped per incident and per minute per camera. Everything else is decided by V-JEPA + head alone.
 
+A hard Meta API budget (EscalationBudget) caps submissions per camera session (default 3) and per
+local day across cameras and restarts (default 30). The session counter starts at camera start and
+is not reset when a looped video replays. Caps are checked most-permanent first: daily, then
+session, then per incident, then per minute. Only a call that is actually submitted to the API
+takes a per-minute slot or a session/day slot. A refusal takes none of them. The caller counts an
+incident slot only when ``allow`` or ``begin_verify`` returns true. No MODEL_API_KEY still records
+skipped_no_key and does not spend budget or a per-minute slot. Over-cap attempts are not submitted;
+they are stored as skipped_budget. F1 skips and verify-gate skips use the same reason names
+(``minute_cap``, not the old ``rate_limited``).
+
+F2 (no head protection) and F5 (no hi-vis vest) are not escalated here. `verify_gate.py` keeps
+them muted until Muse Spark confirms them. That check reserves one slot with `reserve` plus
+`EscalationBudget`, and the F2 SAM 3.1 circle uses the same slot.
+
 Escalation steps (each behind a small interface, configured by env vars, never fatal):
   1. SAM 3.1 refine: segment the factor's concept ("hand", "fire", ...) in the peak frame and
      snap the head circle to the SAM box that overlaps it (tighter circle, source "sam3.1").
@@ -16,7 +30,9 @@ Escalation steps (each behind a small interface, configured by env vars, never f
        SAM_BACKEND=off
   2. Muse Spark verdict: the peak frame with the circle drawn + the factor definition, asking
      for a JSON verdict {confirmed, severity 1-5, reason, action}.
-       MUSE_BACKEND=api  (default) Meta Model API, model MUSE_SPARK_MODEL (default muse-spark-1.3)
+       MUSE_BACKEND=api  (default) Meta Model API, model MUSE_SPARK_MODEL if set,
+                         else escalation.muse_model, else muse-spark-1.3-contributor
+                         (Muse Spark 1.3 Contributor)
        MUSE_BACKEND=off
   Auth for both API backends: MODEL_API_KEY (alias META_API_KEY); base URL META_API_BASE_URL
   (default https://api.meta.ai/v1). With no key the step records status "skipped_no_key".
@@ -25,15 +41,21 @@ from __future__ import annotations
 
 import base64
 import concurrent.futures as cf
+import datetime as dt
 import json
 import os
 import re
+import tempfile
+import threading
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from .localize import Circle, box_to_circle
 
 DEFAULT_BASE = "https://api.meta.ai/v1"
+# Meta Model API id for Muse Spark 1.3 Contributor (GET /v1/models).
+DEFAULT_MUSE_MODEL = "muse-spark-1.3-contributor"
 
 SAM_PROMPTS = {
     "F1": "hand", "F2": "person", "F3": "face", "F4": "hand", "F5": "person", "F6": "person",
@@ -50,12 +72,18 @@ class EscalationPolicy:
     max_per_minute: int = 6
     _recent: list = field(default_factory=list)
 
-    def decide(self, factor: str, score: float, threshold: float, n_in_incident: int, now: float) -> tuple[bool, str]:
-        if n_in_incident >= self.max_per_incident:
-            return False, "incident_cap"
-        self._recent = [t for t in self._recent if now - t < 60.0]
-        if len(self._recent) >= self.max_per_minute:
-            return False, "rate_limited"
+    def decide(self, factor: str, score: float, threshold: float, n_in_incident: int, now: float,
+               *, commit: bool = True) -> tuple[bool, str]:
+        """Whether this factor would escalate. A per-minute refusal is ``minute_cap``.
+
+        ``commit`` records the timestamp. ``Escalator.allow`` passes ``commit=False`` and calls
+        ``note_submission`` only after the Meta API budget accepts the call, so a later refusal
+        does not occupy the per-minute window. Direct callers keep the old "True means counted"
+        behaviour.
+        """
+        blocked = self._slot_block(n_in_incident, now)
+        if blocked:
+            return False, blocked
         ratio = score / max(threshold, 1e-6)
         if factor in self.high_severity:
             reason = "high_severity"
@@ -63,8 +91,38 @@ class EscalationPolicy:
             reason = f"uncertain(score/threshold={ratio:.2f})"
         else:
             return False, f"confident(score/threshold={ratio:.2f})"
-        self._recent.append(now)
+        if commit:
+            self.note_submission(now)
         return True, reason
+
+    def reserve(self, n_in_incident: int, now: float, *, commit: bool = True) -> tuple[bool, str]:
+        """Take one per-incident and per-minute slot, with no severity check.
+
+        The verify gate uses this so its one Muse request (and the F2 SAM call that follows)
+        shares the same caps as other escalations. A refusal does not record a timestamp.
+        The per-minute refusal is ``minute_cap`` (older events may still say ``rate_limited``).
+        ``commit=False`` leaves the window unchanged until ``note_submission``.
+        """
+        blocked = self._slot_block(n_in_incident, now)
+        if blocked:
+            return False, blocked
+        if commit:
+            self.note_submission(now)
+        return True, "verify_gate"
+
+    def note_submission(self, now: float) -> None:
+        """Record one API submission in the per-minute window. Refusals must not call this."""
+        self._recent = [t for t in self._recent if now - t < 60.0]
+        self._recent.append(now)
+
+    def _slot_block(self, n_in_incident: int, now: float) -> str | None:
+        """Incident cap, then minute cap. Does not record a timestamp. Drops expired ones."""
+        if n_in_incident >= self.max_per_incident:
+            return "incident_cap"
+        self._recent = [t for t in self._recent if now - t < 60.0]
+        if len(self._recent) >= self.max_per_minute:
+            return "minute_cap"
+        return None
 
 
 # ------------------------------------------------------------------ helpers
@@ -76,12 +134,20 @@ def api_base() -> str:
     return (os.environ.get("META_API_BASE_URL") or DEFAULT_BASE).rstrip("/")
 
 
-def jpeg_data_url(img, max_w: int = 1280, quality: int = 88) -> str:
+def jpeg_data_url(img, max_w: int = 1280, quality: int = 88, long_side: int | None = None) -> str:
     import cv2
     h, w = img.shape[:2]
-    if w > max_w:
+    if long_side is not None:
+        longest = max(h, w)
+        if longest > long_side:
+            scale = long_side / float(longest)
+            nw, nh = max(1, int(round(w * scale))), max(1, int(round(h * scale)))
+            img = cv2.resize(img, (nw, nh), interpolation=cv2.INTER_AREA)
+    elif w > max_w:
         img = cv2.resize(img, (max_w, int(h * max_w / w)), interpolation=cv2.INTER_AREA)
     ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, quality])
+    if not ok:
+        raise RuntimeError("jpeg encode failed")
     return "data:image/jpeg;base64," + base64.b64encode(buf.tobytes()).decode()
 
 
@@ -195,6 +261,23 @@ class SamRefiner:
                           "w": w, "h": h, "c": float(s)})
         return boxes
 
+    def segment(self, img, prompt: str) -> dict:
+        """One SAM request for `prompt`. ``sent`` is false when no HTTP call was made.
+
+        Boxes are in the image's coordinate frame. The verify gate picks the box; this method
+        does not snap a circle.
+        """
+        st = self.status()
+        if st in ("off", "skipped_no_key"):
+            return {"status": st, "boxes": [], "prompt": prompt, "sent": False}
+        try:
+            boxes = self._api(img, prompt) if self.backend == "api" else self._local_boxes(img, prompt)
+        except Exception as e:
+            return {"status": "error", "error": repr(e)[:300], "boxes": [], "prompt": prompt,
+                    "sent": True, "backend": self.backend}
+        return {"status": "ok" if boxes else "no_match", "boxes": boxes or [], "prompt": prompt,
+                "sent": True, "backend": self.backend, "model": self.model}
+
     def refine(self, img, factor: str, circle: Circle) -> dict:
         st = self.status()
         if st in ("off", "skipped_no_key"):
@@ -216,6 +299,23 @@ class SamRefiner:
         return res
 
 
+def resolve_muse_model(configured: str | None = None, override: str | None = None) -> str:
+    """Model id for a Muse Spark request.
+
+    An explicit ``override`` (the eval CLI ``--model``) wins. Otherwise
+    ``MUSE_SPARK_MODEL`` if it is set, then ``configured`` (``escalation.muse_model``),
+    then Muse Spark 1.3 Contributor.
+    """
+    if override is not None and str(override).strip():
+        return str(override).strip()
+    env = os.environ.get("MUSE_SPARK_MODEL")
+    if env is not None and str(env).strip():
+        return str(env).strip()
+    if configured is not None and str(configured).strip():
+        return str(configured).strip()
+    return DEFAULT_MUSE_MODEL
+
+
 # ------------------------------------------------------------------ Muse Spark
 VERDICT_PROMPT = """You are a workshop safety reviewer. An automatic hazard watcher flagged this camera frame.
 Flagged factor: {fid} - {fname}: {fdesc}
@@ -225,9 +325,10 @@ Look at the circled area and the whole frame. Answer with JSON only:
 
 
 class MuseVerifier:
-    def __init__(self, factor_defs: dict | None = None):
+    def __init__(self, factor_defs: dict | None = None, model: str | None = None):
         self.backend = (os.environ.get("MUSE_BACKEND") or "api").lower()
-        self.model = os.environ.get("MUSE_SPARK_MODEL") or "muse-spark-1.3"
+        # ``model`` is escalation.muse_model. MUSE_SPARK_MODEL still wins.
+        self.model = resolve_muse_model(model)
         self.defs = factor_defs or {}
 
     def status(self) -> str:
@@ -250,13 +351,174 @@ class MuseVerifier:
             r = requests.post(api_base() + "/chat/completions", json=body, timeout=60,
                               headers={"Authorization": f"Bearer {api_key()}", "Content-Type": "application/json"})
             if r.status_code >= 400:
-                return {"status": "error", "error": f"HTTP {r.status_code}: {r.text[:200]}"}
+                return {"status": "error", "error": f"HTTP {r.status_code}: {r.text[:200]}",
+                        "backend": "meta_api", "model": self.model}
             text = r.json()["choices"][0]["message"].get("content") or ""
         except Exception as e:
-            return {"status": "error", "error": repr(e)[:300]}
-        out = {"status": "ok", "backend": "meta_api", "model": self.model, "latency_s": round(time.time() - t0, 2)}
+            return {"status": "error", "error": repr(e)[:300], "backend": "meta_api", "model": self.model}
+        out = {"status": "ok", "backend": "meta_api", "model": self.model,
+               "latency_s": round(time.time() - t0, 2)}
         out.update(parse_verdict(text))
         return out
+
+
+# ------------------------------------------------------------------ Meta API budget
+_BUDGET_LOCKS: dict[str, threading.Lock] = {}
+_BUDGET_LOCKS_GUARD = threading.Lock()
+# Most permanent first. When several caps refuse, the earliest one is the stored reason.
+CAP_PRIORITY = ("daily_cap", "session_cap", "incident_cap", "minute_cap")
+_CAP_RANK = {reason: i for i, reason in enumerate(CAP_PRIORITY)}
+BUDGET_REASONS = CAP_PRIORITY
+
+
+def canonical_skip_reason(reason: str | None) -> str | None:
+    """Map the old per-minute name onto ``minute_cap``. Other reasons pass through."""
+    if reason == "rate_limited":
+        return "minute_cap"
+    return reason
+
+
+def strictest_cap(*reasons: str | None) -> str | None:
+    """The most permanent cap among ``reasons``, or None when none of them is a cap."""
+    found = [r for r in reasons if r in _CAP_RANK]
+    if not found:
+        return None
+    return min(found, key=_CAP_RANK.__getitem__)
+
+
+def _budget_file_lock(path) -> threading.Lock:
+    """One lock per budget file so two cameras in this process cannot lose an increment."""
+    key = os.path.normcase(os.path.abspath(path))
+    with _BUDGET_LOCKS_GUARD:
+        lock = _BUDGET_LOCKS.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _BUDGET_LOCKS[key] = lock
+        return lock
+
+
+def skip_entry(factor: str, t, reason: str) -> dict:
+    """Skipped-escalation record. Cap refusals carry status skipped_budget.
+
+    ``rate_limited`` is stored as ``minute_cap``. Old event files may still contain
+    ``rate_limited``; readers accept both.
+    """
+    reason = canonical_skip_reason(reason) or reason
+    entry = {"factor": factor, "t": t, "reason": reason}
+    if reason in BUDGET_REASONS:
+        entry["status"] = "skipped_budget"
+    return entry
+
+
+class EscalationBudget:
+    """Session counter plus a shared daily file counter for Meta API escalations.
+
+    A session is one camera start until stop (one pipeline instance). Call ``reset_session``
+    at that start; do not reset it when a looped file replays. The daily file lives at
+    ``<data_dir>/escalation_budget.json`` and rolls over at local midnight. ``try_consume``
+    re-reads the file under a lock and writes it with a temp file plus ``os.replace``.
+    A missing file counts as 0. A corrupt file counts as 0 and is overwritten.
+    """
+
+    def __init__(self, data_dir, max_per_session: int = 3, max_per_day: int = 30, today=None):
+        self.path = Path(data_dir) / "escalation_budget.json"
+        self.max_per_session = int(max_per_session)
+        self.max_per_day = int(max_per_day)
+        self._today = today or (lambda: dt.date.today().isoformat())
+        self._lock = threading.Lock()
+        self._session_used = 0
+
+    def reset_session(self) -> None:
+        with self._lock:
+            self._session_used = 0
+
+    def snapshot(self) -> dict:
+        with self._lock:
+            with _budget_file_lock(self.path):
+                today, count, repair = self._load()
+                if repair:
+                    self._write(today, 0)
+                    count = 0
+            return {"session_used": self._session_used, "session_max": self.max_per_session,
+                    "day_used": count, "day_max": self.max_per_day}
+
+    def blocking_reason(self) -> str | None:
+        """The most permanent cap that would refuse a new submission, without taking a slot.
+
+        ``daily_cap`` wins over ``session_cap``. A clear budget returns None. Nothing is written.
+        """
+        with self._lock:
+            session_blocked = self.max_per_session <= 0 or self._session_used >= self.max_per_session
+            with _budget_file_lock(self.path):
+                _today, count, _repair = self._load()
+            if self.max_per_day <= 0 or count >= self.max_per_day:
+                return "daily_cap"
+            if session_blocked:
+                return "session_cap"
+            return None
+
+    def try_consume(self) -> tuple[bool, str | None]:
+        """Take one slot. ``(True, None)`` on success, else ``(False, 'daily_cap'|'session_cap')``.
+
+        A max of 0 refuses every call. The file is re-read inside the lock immediately before
+        the increment. Daily is checked before session, so both being exhausted reports
+        ``daily_cap``. Nothing is written when a cap refuses, except a corrupt file is repaired
+        when the daily cap is the reason.
+        """
+        with self._lock:
+            session_blocked = self.max_per_session <= 0 or self._session_used >= self.max_per_session
+            with _budget_file_lock(self.path):
+                today, count, repair = self._load()
+                if self.max_per_day <= 0 or count >= self.max_per_day:
+                    if repair:
+                        self._write(today, 0)
+                    return False, "daily_cap"
+                if session_blocked:
+                    return False, "session_cap"
+                self._write(today, count + 1)
+            self._session_used += 1
+            return True, None
+
+    def _load(self) -> tuple[str, int, bool]:
+        """``(today, count, repair)``. Caller holds the file lock. Stale dates count as 0."""
+        today = self._today()
+        try:
+            text = self.path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return today, 0, False
+        except OSError:
+            return today, 0, True
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            return today, 0, True
+        if not isinstance(data, dict):
+            return today, 0, True
+        date, count = data.get("date"), data.get("count")
+        count_ok = isinstance(count, int) and not isinstance(count, bool) and count >= 0
+        date_ok = isinstance(date, str) and len(date) == 10
+        if not count_ok or not date_ok:
+            return today, 0, True
+        if date != today:
+            return today, 0, False
+        return today, count, False
+
+    def _write(self, today: str, count: int) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmpname = tempfile.mkstemp(prefix=".escalation_budget.", suffix=".tmp", dir=self.path.parent)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                json.dump({"date": today, "count": int(count)}, fh)
+                fh.write("\n")
+                fh.flush()
+                os.fsync(fh.fileno())
+            os.replace(tmpname, self.path)
+        except Exception:
+            try:
+                os.unlink(tmpname)
+            except OSError:
+                pass
+            raise
 
 
 # ------------------------------------------------------------------ async runner
@@ -264,13 +526,88 @@ class Escalator:
     """Runs escalations in a small thread pool so the live loop never waits on the network."""
 
     def __init__(self, policy: EscalationPolicy, sam: SamRefiner, muse: MuseVerifier, enabled: bool = True,
-                 timeout_s: float = 30.0):
+                 timeout_s: float = 30.0, budget: EscalationBudget | None = None):
         self.policy, self.sam, self.muse = policy, sam, muse
         self.enabled, self.timeout_s = enabled, timeout_s
+        self.budget = budget
         self.pool = cf.ThreadPoolExecutor(max_workers=2, thread_name_prefix="sightline-escalate")
 
     def status(self) -> dict:
-        return {"enabled": self.enabled, "sam3.1": self.sam.status(), "muse_spark": self.muse.status()}
+        out = {"enabled": self.enabled, "sam3.1": self.sam.status(), "muse_spark": self.muse.status()}
+        if self.budget is not None:
+            out["budget"] = self.budget.snapshot()
+        return out
+
+    def reset_session(self) -> None:
+        if self.budget is not None:
+            self.budget.reset_session()
+
+    def spends_meta_api(self) -> bool:
+        """True when submit would call the Meta Model API. No key, or both backends off, does not."""
+        if not api_key():
+            return False
+        return self.sam.status() == "ready" or self.muse.status() == "ready"
+
+    def _budget_block(self, go: bool, why: str) -> str | None:
+        """Daily or session refusal, and only when this attempt would otherwise be sent."""
+        if self.budget is None or not self.spends_meta_api():
+            return None
+        if not go and why not in ("incident_cap", "minute_cap"):
+            return None
+        return self.budget.blocking_reason()
+
+    def allow(self, factor: str, score: float, threshold: float, n_in_incident: int, now: float) -> tuple[bool, str]:
+        """Policy, then the budget. ``(True, reason)`` means the caller should ``submit``.
+
+        Caps are reported most-permanent first (daily, session, incident, minute). The per-minute
+        window and the session/day counters move only when the Meta API will actually be called.
+        A refusal is ``(False, reason)`` and leaves those counters unchanged.
+        """
+        go, why = self.policy.decide(factor, score, threshold, n_in_incident, now, commit=False)
+        why = canonical_skip_reason(why) or why
+        cap = strictest_cap(self._budget_block(go, why), None if go else why)
+        if cap:
+            return False, cap
+        if not go:
+            return False, why
+        if not self.spends_meta_api():
+            return True, why
+        if self.budget is not None:
+            ok, reason = self.budget.try_consume()
+            if not ok:
+                return False, canonical_skip_reason(reason) or reason or "session_cap"
+        self.policy.note_submission(now)
+        return True, why
+
+    def begin_verify(self, n_in_incident: int, now: float) -> tuple[bool, str]:
+        """Reserve one shared cap slot and one Meta API budget unit for a verify-gate request.
+
+        A missing key or a Muse backend that is off fails closed and spends nothing. Caps and
+        budget are taken only when the HTTP call is about to happen. ``(True, 'verify_gate')``
+        means the caller should send exactly one Muse request. The F2 SAM call is part of this
+        same slot and must not reserve again. Refusals use the same names as F1 skips, most
+        permanent first, and do not count toward the per-minute or per-incident caps.
+        """
+        if not self.enabled:
+            return False, "escalation_disabled"
+        if not api_key():
+            return False, "skipped_no_key"
+        if self.muse.status() != "ready":
+            return False, "muse_off"
+        go, why = self.policy.reserve(n_in_incident, now, commit=False)
+        why = canonical_skip_reason(why) or why
+        block = self.budget.blocking_reason() if self.budget is not None and (go or why in ("incident_cap", "minute_cap")) else None
+        cap = strictest_cap(block, None if go else why)
+        if cap:
+            return False, cap
+        if not go:
+            return False, why
+        if self.budget is not None:
+            ok, reason = self.budget.try_consume()
+            if not ok:
+                return False, canonical_skip_reason(reason) or reason or "session_cap"
+        self.policy.note_submission(now)
+        return True, why
 
     def submit(self, frame, factor: str, circle: Circle, score: float, thr: float, draw_fn):
         def job():
@@ -288,3 +625,5 @@ class Escalator:
 
     def shutdown(self):
         self.pool.shutdown(wait=False, cancel_futures=True)
+
+

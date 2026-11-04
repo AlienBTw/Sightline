@@ -19,15 +19,18 @@ def draw_overlays(img: np.ndarray, overlays: list[dict], header: str | None = No
     th = max(2, int(round(w / 320)))
     fs = max(0.5, w / 1600)
     for ov in overlays:
+        circle = ov.get("circle")
+        n = circle.get("norm") if isinstance(circle, dict) else None
+        if not isinstance(n, dict):
+            continue
         f = ov["factor"]
-        n = ov["circle"]["norm"]
         cx, cy, r = int(n["cx"] * w), int(n["cy"] * h), max(4, int(n["rx"] * w))
         col = COLORS.get(f, (0, 0, 255))
         cv2.circle(out, (cx, cy), r, (0, 0, 0), th + 3, cv2.LINE_AA)
         cv2.circle(out, (cx, cy), r, col, th, cv2.LINE_AA)
         label = f"{FACTOR_LABELS.get(f, f)} {ov.get('score', 0):.2f}"
-        if ov["circle"].get("source", "head") != "head":
-            label += f" [{ov['circle']['source']}]"
+        if circle.get("source", "head") != "head":
+            label += f" [{circle['source']}]"
         (tw, tht), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, fs, 1)
         x = min(max(0, cx - tw // 2), max(0, w - tw - 4))
         y = cy - r - 8 if cy - r - 8 > tht + 4 else min(h - 4, cy + r + tht + 8)

@@ -7,6 +7,14 @@ Per frame: ring buffer + 16-frame sampler. About every `stride_s` of stream time
 step -> IncidentTracker -> circles for active factors -> escalation on factor-on (policy) ->
 clip writing. When an incident closes (+ post roll) the event folder and SQLite row are written
 and `on_event(record)` is called (the backend turns that into a push notification).
+
+F2 (no head protection) and F5 (no hi-vis vest) stay muted in the tracker. Each can open or
+join an incident only through `escalation.verify_gates`. A gated factor is published only
+when one batched Muse Spark check confirms it. The frames in that check are the last few
+seconds where the factor stayed above its trigger, not the pre-roll. F2 and F5 then draw
+their circles from SAM 3.1 on that same escalation slot, only within sam_hold_s of the
+frame SAM ran on. A gated-only incident's thumbnail is that frame. Caps, a missing key,
+a timeout, or a bad answer leave the factor unpublished. F1 is unchanged.
 """
 from __future__ import annotations
 
@@ -24,11 +32,13 @@ import yaml
 
 from . import localize, render
 from .config import FACTOR_LABELS, FACTORS_YAML, effective_thresholds, resolve_path
-from .escalation import EscalationPolicy, Escalator, MuseVerifier, SamRefiner
+from .escalation import (EscalationBudget, EscalationPolicy, Escalator, MuseVerifier, SamRefiner,
+                         skip_entry)
 from .events import IncidentTracker
 from .ingest import VideoSource, redact
 from .risk import confidence, noisy_or
 from .storage import ClipWriter, EventStore, RingBuffer, resize_w
+from .verify_gate import FactorTrigger, VerifyGates, apply_verify_result, downscale_bgr
 
 
 class WindowSampler:
@@ -68,6 +78,7 @@ class OpenIncident:
     risk_max: float = 0.0
     wall0: str = ""
     frames: int = 0
+    gate_samples: list = field(default_factory=list)   # frames while a verify-gate factor is above its trigger
 
 
 def _factor_defs() -> dict:
@@ -81,16 +92,29 @@ def _factor_defs() -> dict:
 class SightlinePipeline:
     def __init__(self, cfg: dict, model, store: EventStore | None = None, escalator: Escalator | None = None):
         self.cfg, self.model = cfg, model
-        self.store = store or EventStore(resolve_path(cfg["storage"]["data_dir"]))
+        data_dir = resolve_path(cfg["storage"]["data_dir"])
+        self.store = store or EventStore(data_dir)
         ev = cfg["events"]
         self.hidden = set(ev.get("hidden_factors", []))
         self.thr = effective_thresholds({f: t for f, t in model.ckpt_thresholds.items()}, cfg)
         self.alert_factors = [f for f in model.factors if f not in self.hidden]
         es = cfg["escalation"]
-        self.escalator = escalator or Escalator(
-            EscalationPolicy(tuple(es["high_severity"]), tuple(es["uncertain_band"]), es["max_per_incident"],
-                             es["max_per_minute"]),
-            SamRefiner(), MuseVerifier(_factor_defs()), enabled=es["enabled"], timeout_s=es["timeout_s"])
+        gate_cfg = es.get("verify_gates") if isinstance(es.get("verify_gates"), dict) else {}
+        muse_model = es.get("muse_model")
+        self._verify_asked = bool(gate_cfg.get("enabled"))
+        esc_on = bool(es.get("enabled", True))
+        if escalator is None:
+            self.escalator = Escalator(
+                EscalationPolicy(tuple(es["high_severity"]), tuple(es["uncertain_band"]), es["max_per_incident"],
+                                 es["max_per_minute"]),
+                SamRefiner(), MuseVerifier(_factor_defs(), model=muse_model), enabled=es["enabled"],
+                timeout_s=es["timeout_s"],
+                budget=EscalationBudget(data_dir, int(es.get("max_per_session", 3)), int(es.get("max_per_day", 30))))
+        else:
+            self.escalator = escalator
+            esc_on = esc_on and bool(getattr(escalator, "enabled", False))
+        self.verify = VerifyGates.from_cfg(gate_cfg, enabled=esc_on, localization=cfg.get("localization"),
+                                            model=muse_model)
         self._finalizers: list[threading.Thread] = []
 
     # ------------------------------------------------------------------ helpers
@@ -108,6 +132,27 @@ class SightlinePipeline:
         ov = [{"factor": f, "score": score, "circle": circle.to_dict()}]
         return render.draw_overlays(frame, ov)
 
+    def _factor_thr(self, factor: str) -> float:
+        if factor in self.verify.active_ids:
+            thr = self.verify.threshold(factor)
+            if thr is not None:
+                return thr
+        return self.thr[factor]
+
+    def _remember_gate_frame(self, oi: OpenIncident, image, scores: dict, t: float) -> None:
+        """Keep one above-trigger frame. Pre-roll (before the incident opened) is not kept.
+
+        The buffer is capped by dropping the oldest frames, so the last few seconds the gate
+        samples from stay intact.
+        """
+        if t < float(oi.inc.start):
+            return
+        frame = downscale_bgr(image, self.verify.long_side)
+        oi.gate_samples.append({"image": frame.copy(), "t": float(t),
+                                "scores": {k: float(v) for k, v in scores.items()}})
+        if len(oi.gate_samples) > 48:
+            del oi.gate_samples[:-48]
+
     # ------------------------------------------------------------------ main loop
     def process(self, source: VideoSource, camera_id: str = "cam_01", on_event=None, stop: threading.Event | None = None,
                 max_seconds: float | None = None, session_video: str | None = None, log=print, on_step=None) -> dict:
@@ -116,8 +161,9 @@ class SightlinePipeline:
         s, c = self.cfg["sampling"], self.cfg["clips"]
         sampler = WindowSampler(self.model.n_frames, float(s["sample_interval_s"]), self.model.preprocess)
         ev = self.cfg["events"]
+        muted = list(dict.fromkeys(list(ev.get("muted_factors", [])) + list(self.verify.configured_ids)))
         tracker = IncidentTracker(self.thr, ev["ema_alpha"], ev["min_on_steps"], ev["min_off_steps"], ev["off_ratio"],
-                                  ev["merge_gap_s"], ev["max_incident_s"], muted=tuple(ev.get("muted_factors", [])),
+                                  ev["merge_gap_s"], ev["max_incident_s"], muted=tuple(muted),
                                   hidden=tuple(self.hidden))
         ring = RingBuffer(float(c["pre_s"]) + 1.0)
         stride = float(s["stride_s"])
@@ -128,6 +174,11 @@ class SightlinePipeline:
         session_w, active_ov = None, []
         wall_start, t_first, t_last, n_frames = time.time(), None, 0.0, 0
         clip_w = int(c["width"])
+        if self._verify_asked and not self.verify.enabled:
+            log(json.dumps({"msg": "verify_gates_ignored", "reason": "escalation_disabled"}))
+        triggers = {f: FactorTrigger(self.verify.threshold(f), ev["min_on_steps"], ev["min_off_steps"], ev["off_ratio"])
+                    for f in self.verify.active_ids}
+        self.verify.reset()
         log(json.dumps({"msg": "start", "camera": camera_id, "source": redact(source.uri), "kind": source.kind,
                         "realtime": source.realtime, "thresholds": {f: round(v, 4) for f, v in self.thr.items()},
                         "escalation": self.escalator.status()}))
@@ -155,6 +206,14 @@ class SightlinePipeline:
                     probs = {f: p for f, p in out["probs"].items() if f not in self.hidden}
                     trans = tracker.update(t, probs)
                     sm = tracker.smoothed()
+                    for fid, trigger in triggers.items():
+                        if fid not in sm:
+                            continue
+                        edge = trigger.update(sm[fid])
+                        if trigger.on:
+                            trans.extend(tracker.note_gate_factor(t, fid, sm[fid], trigger.threshold, True))
+                        elif edge == "off":
+                            trans.extend(tracker.note_gate_factor(t, fid, sm[fid], trigger.threshold, False))
                     steps.append({"t": round(t, 2), "p": {f: round(v, 4) for f, v in probs.items()},
                                   "ema": {f: round(sm[f], 4) for f in probs}})
                     last_out, last_step_t = out, t
@@ -179,25 +238,34 @@ class SightlinePipeline:
                             circ = self.circles_for(out, f, W, H)
                             n_esc = len(open_inc.escalations)
                             if circ and self.escalator.enabled:
-                                go, why = self.escalator.policy.decide(f, sm[f], self.thr[f], n_esc, time.time())
+                                go, why = self.escalator.allow(f, sm[f], self.thr[f], n_esc, time.time())
                                 if go:
                                     fut = self.escalator.submit(fr.image.copy(), f, circ[0], sm[f], self.thr[f], self._draw_one)
                                     open_inc.escalations.append((f, t, why, fut))
                                 else:
-                                    open_inc.skipped.append({"factor": f, "t": round(t, 2), "reason": why})
+                                    open_inc.skipped.append(skip_entry(f, round(t, 2), why))
                             log(json.dumps({"msg": "factor_on", "event_id": open_inc.event_id, "factor": f,
                                             "score": round(sm[f], 4), "thr": round(self.thr[f], 4), "t": round(t, 2)}))
                         elif tr[0] == "close" and open_inc is not None:
                             closing.append(open_inc)
                             log(json.dumps({"msg": "incident_close", "event_id": open_inc.event_id, "t": round(t, 2)}))
                             open_inc = None
-                    # circles for factors that are on (current incident)
+                    # circles for factors that are on (current incident). A verify-gated factor
+                    # is not shown on the live view until Muse Spark confirms it at incident close.
                     active_ov = []
+                    stored_ov = []
                     on = [f for f, st in tracker.state.items() if st.on]
+                    for f in tracker._open_seg:
+                        if f not in on:
+                            on.append(f)
                     for f in on:
+                        provisional = f in self.verify.active_ids
                         for ci in self.circles_for(out, f, small.shape[1], small.shape[0]):
-                            active_ov.append({"factor": f, "score": round(sm[f], 4), "raw": round(probs[f], 4),
-                                              "circle": ci.to_dict()})
+                            item = {"factor": f, "score": round(sm[f], 4), "raw": round(probs.get(f, 0.0), 4),
+                                    "circle": ci.to_dict()}
+                            stored_ov.append(item)
+                            if not provisional:
+                                active_ov.append(item)
                     if on_step is not None:
                         try:
                             on_step({"camera_id": camera_id, "t": round(t, 2), "wall": fr.wall,
@@ -206,8 +274,9 @@ class SightlinePipeline:
                         except Exception as e:   # a preview hook must never stop the live loop
                             log(json.dumps({"msg": "on_step_error", "error": repr(e)[:200]}))
                     if open_inc is not None and on:
-                        risk = noisy_or(confidence(sm[f], self.thr[f]) for f in on)
-                        for o in active_ov:
+                        risk_factors = on
+                        risk = noisy_or(confidence(sm[f], self._factor_thr(f)) for f in risk_factors)
+                        for o in stored_ov:
                             open_inc.overlays.append({"t_ms": int(round((t - open_inc.clip_t0) * 1000)),
                                                       "t_stream": round(t, 2), **o, "risk": round(risk, 4)})
                         if risk > open_inc.risk_max:
@@ -217,6 +286,12 @@ class SightlinePipeline:
                                     full.append({"factor": f, "score": round(sm[f], 4), "circle": ci.to_dict()})
                             open_inc.risk_max = risk
                             open_inc.peak = (risk, t, fr.image.copy(), full)
+                    if self.verify.active_ids and open_inc is not None:
+                        hot = {f: sm[f] for f in self.verify.active_ids
+                               if sm.get(f, 0.0) >= (self.verify.threshold(f) or 1.0)}
+                        if hot:
+                            self._remember_gate_frame(open_inc, fr.image,
+                                                      {f: sm.get(f, 0.0) for f in self.verify.active_ids}, t)
                 # ---- clip recording
                 for oi in ([open_inc] if open_inc else []) + closing:
                     oi.raw.write(small)
@@ -276,6 +351,17 @@ class SightlinePipeline:
                 r = {"factor": f, "status": "error", "error": repr(e)[:200]}
             r.update({"t_stream": round(t, 2), "reason": why})
             esc_calls.append(r)
+        gate_result = None
+        triggered = [f for f in self.verify.active_ids if f in inc.factors]
+        if triggered:
+            t_stream = round(inc.end if inc.end is not None else inc.start, 2)
+            gate_result = self.verify.evaluate(
+                oi.event_id, triggered, oi.gate_samples,
+                lambda: self.escalator.begin_verify(len(oi.escalations), time.time()),
+                t_stream=t_stream, sam=self.escalator.sam)
+            if not gate_result.get("cached"):
+                esc_calls.extend(gate_result.get("calls") or [])
+                oi.skipped.extend(gate_result.get("skipped") or [])
         top_f = max(inc.segments, key=lambda sg: confidence(sg.peak, sg.threshold)).factor if inc.segments else None
         segs = [{"factor": s.factor, "label": FACTOR_LABELS.get(s.factor), "start_s": round(s.start, 2),
                  "end_s": round(s.end if s.end is not None else inc.end, 2), "peak_score": round(s.peak, 4),
@@ -291,7 +377,8 @@ class SightlinePipeline:
             "clip_codec": codec, "clip_size": list(oi.clip_size), "clip_fps": round(min(fps, self.cfg["clips"]["fps_cap"]), 3),
             "escalation": {"policy": {"high_severity": list(self.escalator.policy.high_severity),
                                       "uncertain_band": list(self.escalator.policy.uncertain_band)},
-                           "backends": self.escalator.status(), "calls": esc_calls, "skipped": oi.skipped},
+                           "backends": self.escalator.status(), "calls": esc_calls, "skipped": oi.skipped,
+                           **({"budget": self.escalator.budget.snapshot()} if self.escalator.budget is not None else {})},
             "overlays": oi.overlays,
             "localization": {f: ("validated: F1 patch evidence, Zenodo test hand boxes" if f == "F1" else
                                  "weak: MIL attention map, not validated (refined by SAM 3.1 on escalation)")
@@ -299,13 +386,44 @@ class SightlinePipeline:
             "model": {"encoder": "V-JEPA 2.1 ViT-L/16 384", "head": Path(str(self.cfg["model"]["head_checkpoint"])).stem,
                       "mil_windows": self.cfg["sampling"]["mil_windows"], "stride_s": self.cfg["sampling"]["stride_s"]},
         }
-        # thumbnail: peak frame with circles (SAM-refined circle where escalation returned one)
+        publish = True
         risk, pt, frame, full = oi.peak
-        if frame is not None:
-            refined = {r["factor"]: r["final_circle"] for r in esc_calls if r.get("final_circle")
-                       and r.get("sam3.1", {}).get("circle")}
-            ovs = [dict(o, circle=refined.get(o["factor"], o["circle"])) for o in full]
-            import cv2
+        if isinstance(pt, (int, float)) and not isinstance(pt, bool):
+            for o in full:
+                if isinstance(o, dict):
+                    o["t_stream"] = float(pt)
+        if gate_result is not None:
+            publish = apply_verify_result(rec, gate_result, extra_overlays=full)
+            factors = (rec.get("escalation") or {}).get("verify_gates", {}).get("factors") or {}
+            log(json.dumps({"msg": "verify_gates", "event_id": oi.event_id, "publish": publish,
+                            "factors": {fid: info.get("status") for fid, info in factors.items()}}))
+        # Gated-only incidents (F2/F5) use the SAM frame so the circle is on the person.
+        # F1, and a gated factor whose SAM call failed, keep the risk-peak frame.
+        suppressed = set(((rec.get("escalation") or {}).get("verify_gates") or {}).get("suppressed") or [])
+        thumb = sam_thumbnail(rec, gate_result, self.verify.configured_ids)
+        import cv2
+        if thumb is not None:
+            image, ovs, sam_t = thumb
+            cv2.imwrite(str(d / "thumb.jpg"), resize_w(render.draw_overlays(image, ovs), 960),
+                        [cv2.IMWRITE_JPEG_QUALITY, 88])
+            rec["peak_t_stream"] = sam_t
+        elif frame is not None:
+            refined = {}
+            for r in esc_calls:
+                if r.get("reason") == "verify_gate":
+                    continue
+                circle = r.get("final_circle")
+                sam = r.get("sam3.1")
+                if circle and isinstance(sam, dict) and sam.get("circle"):
+                    refined[r["factor"]] = circle
+            ovs = []
+            for o in full:
+                if o.get("factor") in suppressed:
+                    continue
+                circle = refined.get(o["factor"], o.get("circle"))
+                if not isinstance(circle, dict):
+                    continue
+                ovs.append(dict(o, circle=circle))
             cv2.imwrite(str(d / "thumb.jpg"), resize_w(render.draw_overlays(frame, ovs), 960),
                         [cv2.IMWRITE_JPEG_QUALITY, 88])
             rec["peak_t_stream"] = round(pt, 2)
@@ -314,13 +432,53 @@ class SightlinePipeline:
         th.start()
         self._finalizers.append(th)
         events.append(rec)
-        log(json.dumps({"msg": "event_saved", "event_id": oi.event_id, "factors": inc.factors,
-                        "risk_max": rec["risk_max"], "escalations": len(esc_calls), "dir": str(d)}))
-        if on_event:
+        log(json.dumps({"msg": "event_saved", "event_id": oi.event_id, "factors": rec["factors"],
+                        "status": rec["status"], "risk_max": rec["risk_max"],
+                        "escalations": len(esc_calls), "dir": str(d)}))
+        if on_event and publish:
             try:
                 on_event(rec)
             except Exception as e:
                 log(json.dumps({"msg": "on_event_error", "error": repr(e)}))
+
+
+def sam_thumbnail(record: dict, gate_result: dict | None, gated_ids) -> tuple | None:
+    """Frame, SAM circles, and stream time for a gated-only incident thumbnail.
+
+    Returns None when a published factor is not gated, or when SAM did not draw a circle.
+    The image is the frame SAM ran on, so the circle sits on the person.
+    """
+    if not isinstance(gate_result, dict):
+        return None
+    published = [f for f in (record.get("factors") or []) if f]
+    gated = set(gated_ids or [])
+    if not published or any(f not in gated for f in published):
+        return None
+    image = gate_result.get("sam_image")
+    if image is None:
+        return None
+    factors = gate_result.get("factors") or {}
+    overlays = []
+    sam_t = None
+    for fid in published:
+        info = factors.get(fid) or {}
+        circle = info.get("circle")
+        if info.get("circle_source") != "sam3.1" or not isinstance(circle, dict):
+            continue
+        if sam_t is None and isinstance(info.get("sam_t_stream"), (int, float)) and not isinstance(info.get("sam_t_stream"), bool):
+            sam_t = float(info["sam_t_stream"])
+        score = 0.0
+        for seg in record.get("segments") or []:
+            if seg.get("factor") == fid:
+                try:
+                    score = float(seg.get("peak_score") or 0.0)
+                except (TypeError, ValueError):
+                    score = 0.0
+                break
+        overlays.append({"factor": fid, "score": round(score, 4), "circle": circle})
+    if not overlays or sam_t is None:
+        return None
+    return image, overlays, sam_t
 
 
 def overlays_at(overlays: list, t_ms: int, hold_ms: int = 1500) -> list:

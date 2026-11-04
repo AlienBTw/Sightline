@@ -70,6 +70,7 @@ def test_pipeline_end_to_end(tmp_path, monkeypatch):
     assert len(res["events"]) == 1 and len(got) == 1
     rec = got[0]
     assert rec["factors"] == ["F1"] and rec["top_factor"] == "F1"
+    assert "verify_gates" not in rec["escalation"]
     assert 3.0 <= rec["stream_start_s"] <= 4.5 and 5.9 <= rec["stream_end_s"] <= 7.5
     assert rec["escalation"]["calls"][0]["sam3.1"] == {"status": "skipped_no_key"}
     ov = rec["overlays"][0]["circle"]["norm"]

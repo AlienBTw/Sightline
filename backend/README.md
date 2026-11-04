@@ -42,7 +42,7 @@ Everything runs in WSL (Ubuntu-24.04) with `~/vjepa-venv`, which already has Fas
    $PY -m backend.hash_password --admin             # your own password, prompted -> SIGHTLINE_ADMIN_PASSWORD_HASH=...
    ```
    Then add `SIGHTLINE_DEMO_USER=judge` (or another name) and `SIGHTLINE_ADMIN_USER=<you>`. The hash format is `scrypt:N:r:p:salt:hash`, with no `$`, so it's safe in `.env` files and shells.
-2. Optional: `MODEL_API_KEY` turns on the SAM 3.1 and Muse Spark escalations. Without it they're recorded as `skipped_no_key`.
+2. Optional: `MODEL_API_KEY` turns on the SAM 3.1 and Muse Spark 1.3 Contributor (`muse-spark-1.3-contributor`) escalations and the F2/F5 verify gates. Without it they're recorded as `skipped_no_key`, and F2/F5 are stored but never alerted. Every call is capped: 1 per incident, 2 per minute, 3 per camera session, 30 per day (`SIGHTLINE_ESC_MAX_PER_SESSION`, `SIGHTLINE_ESC_MAX_PER_DAY`); see [`sightline_pipeline`](../sightline_pipeline/README.md).
 
 ## Run
 
@@ -89,7 +89,7 @@ Or inside WSL: `bash backend/scripts/run_backend.sh` (foreground), `bash backend
 | `SIGHTLINE_LOG_DIR` | set by `run_backend.sh` to `/mnt/f/models/logs` | Directory for the rotating app log |
 | `SIGHTLINE_HOST` / `SIGHTLINE_PORT` | 127.0.0.1 / 8000 | Bind address, used by `run_backend.sh` |
 
-The pipeline's own variables still apply: `MODEL_API_KEY`, `SAM_BACKEND`, `MUSE_BACKEND`, `SIGHTLINE_ESCALATION` and `SIGHTLINE_DATA_DIR`. See `.env.example`.
+The pipeline's own variables still apply: `MODEL_API_KEY`, `SAM_BACKEND`, `MUSE_BACKEND`, `MUSE_SPARK_MODEL` (Muse Spark 1.3 Contributor, `muse-spark-1.3-contributor`), `SIGHTLINE_ESCALATION`, `SIGHTLINE_VERIFY_GATES`, `SIGHTLINE_VERIFY_GATE_F2`, `SIGHTLINE_VERIFY_GATE_F5` and `SIGHTLINE_DATA_DIR`. See `.env.example`. F2 (no head protection) and F5 (no hi-vis vest) are published only after Muse Spark confirms them; the event's `verified_by` field and `escalation.verify_gates` carry the badge.
 
 ## API
 
@@ -180,7 +180,7 @@ ngrok isn't installed on the build PC yet (checked Oct 31).
 
 ## Tests
 
-`python -m pytest backend/tests -q` runs 23 tests with a fake pipeline (no GPU):
+`python -m pytest backend/tests -q` runs 28 tests with a fake pipeline (no GPU):
 - auth: hashing, login, rate limit, every `/api` route requiring a token, expired or foreign tokens, refresh rotation and reuse, logout, roles
 - uploads: type, size, magic bytes, the decode probe and duration, the resumable chunked protocol
 - GPU capacity cap, and RTSP CRUD with credential redaction

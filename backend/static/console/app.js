@@ -131,6 +131,26 @@ function evRow(e, prepend) {
   return row;
 }
 
+function budgetSkipText(entry, budget) {
+  if (entry.reason === "incident_cap") return "Meta API check skipped: incident limit";
+  if (entry.reason === "minute_cap" || entry.reason === "rate_limited") return "Meta API check skipped: per-minute limit";
+  const daily = entry.reason === "daily_cap";
+  const used = daily ? budget.day_used : budget.session_used;
+  const max = daily ? budget.day_max : budget.session_max;
+  const which = daily ? "daily budget" : "session budget";
+  const frac = Number.isFinite(used) && Number.isFinite(max) ? ` (${used}/${max})` : "";
+  return `Meta API check skipped: ${which}${frac}`;
+}
+
+function verifyBadge(fac) {
+  if (!fac || !fac.status) return "";
+  if (fac.status === "confirmed") return `Verified by Muse Spark (${fac.votes || 0}/${fac.n_frames || 0} frames)`;
+  if (fac.status === "rejected") return "Not confirmed";
+  if (fac.status === "skipped_budget") return "Skipped: API limit";
+  if (fac.status === "failed" || fac.status === "skipped_no_key") return "Check failed";
+  return "";
+}
+
 async function openEvent(id) {
   S.selected = id;
   document.querySelectorAll(".ev").forEach((n) => n.classList.toggle("sel", n.dataset.id === id));
@@ -138,8 +158,18 @@ async function openEvent(id) {
   const video = el("video", { controls: "", playsinline: "", preload: "metadata" });
   const pick = (k) => { video.src = d.media[k].url; video.play().catch(() => {}); };
   pick(d.media.clip_circles.ready ? "clip_circles" : "clip");
-  const esc = (d.escalation && d.escalation.calls) || [];
-  $("detail").replaceChildren(
+  const calls = (d.escalation && d.escalation.calls) || [];
+  const budget = (d.escalation && d.escalation.budget) || {};
+  const budgetSkips = ((d.escalation && d.escalation.skipped) || []).filter((s) => s.status === "skipped_budget");
+  const escParts = calls.map((c) => `${hazardName(c.factor)} (${c.reason})`);
+  for (const s of budgetSkips) escParts.push(`${hazardName(s.factor)}: ${budgetSkipText(s, budget)}`);
+  const gateFactors = (d.escalation && d.escalation.verify_gates && d.escalation.verify_gates.factors) || {};
+  const verified = d.verified_by || Object.values(gateFactors).some((g) => g && g.verified_by);
+  const gateLine = Object.keys(gateFactors).map((id) => {
+    const badge = verifyBadge(gateFactors[id]);
+    return badge ? `${hazardName(id)}: ${badge}` : hazardName(id);
+  });
+  const detail = [
     el("h3", {}, d.top_factor_label || hazardName(d.top_factor)),
     el("div", { class: "muted" }, `${d.camera_id} · ${d.started_at} → ${d.ended_at || ""} · risk ${Math.round(d.risk_max * 100)}% · ${(d.factors || []).map(hazardName).join(", ")}`),
     video,
@@ -149,8 +179,12 @@ async function openEvent(id) {
       el("button", { class: "teal", onclick: () => setStatus(id, "ack") }, "Acknowledge"),
       el("button", { class: "ghost", onclick: () => setStatus(id, "dismiss") }, "Dismiss"),
       el("span", { class: "badge" }, d.status)),
-    el("div", { class: "muted" }, `Escalations: ${esc.length ? esc.map((c) => `${hazardName(c.factor)} (${c.reason})`).join(", ") : "none"}`),
-    el("pre", {}, JSON.stringify({ segments: d.segments, escalation: d.escalation && d.escalation.calls, localization: d.localization }, null, 1)));
+    el("div", { class: "muted" }, `Escalations: ${escParts.length ? escParts.join(", ") : "none"}`),
+  ];
+  if (gateLine.length) detail.push(el("div", {}, gateLine.join(" · ")));
+  else if (verified) detail.push(el("div", {}, "Verified by Muse Spark"));
+  detail.push(el("pre", {}, JSON.stringify({ segments: d.segments, escalation: d.escalation && { calls: d.escalation.calls, skipped: d.escalation.skipped, budget: d.escalation.budget, verify_gates: d.escalation.verify_gates }, localization: d.localization }, null, 1)));
+  $("detail").replaceChildren(...detail);
 }
 
 async function setStatus(id, action) {

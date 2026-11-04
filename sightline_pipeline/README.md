@@ -1,6 +1,6 @@
 # sightline_pipeline: live inference with hazard circles
 
-The live part of Sightline, written during the event window. It takes any camera source, runs Meta **V-JEPA 2.1** plus the trained concept-bottleneck head on sliding windows, raises hazard incidents, circles the flagged area, escalates selected incidents to **SAM 3.1** and **Muse Spark**, and writes clips, event JSON and a SQLite index for the backend and the mobile app.
+The live part of Sightline, written during the event window. It takes any camera source, runs Meta **V-JEPA 2.1** plus the trained concept-bottleneck head on sliding windows, raises hazard incidents, circles the flagged area, escalates selected incidents to **SAM 3.1** and **Muse Spark 1.3 Contributor** (`muse-spark-1.3-contributor`), and writes clips, event JSON and a SQLite index for the backend and the mobile app.
 
 The code lives in a new top-level package, `sightline_pipeline/`. The older `sightline/` package (pre-event MVP, Oct 13-14) stays reference-only. The package reuses the training code directly: `training/03-features/extract_features.py` for the encoder and preprocessing, and `training/04-head/train_head.py` for the head. Live inference therefore uses the same resize, normalisation, token pooling and head as training.
 
@@ -14,7 +14,7 @@ video file / upload ──┴─> ingest.VideoSource ──> ring buffer (clips)
                                                      v
                          events.IncidentTracker: EMA, per-factor thresholds + hysteresis, incident merge
                                                      │
-                 localize: map -> circle         escalation (policy): SAM 3.1 refine + Muse Spark verdict (async)
+                 localize: map -> circle         escalation (policy): SAM 3.1 refine + Muse Spark verdict (async); F2/F5 verify gates
                                                      v
                          storage: clip.mp4, clip_circles.mp4, thumb.jpg, event.json, sightline_events.db
                                                      v
@@ -30,6 +30,8 @@ video file / upload ──┴─> ingest.VideoSource ──> ring buffer (clips)
 | `events.py` | `IncidentTracker`: EMA smoothing (alpha 0.6), a factor turns on after 2 steps at or above its threshold and off after 2 steps below 0.7 x threshold. An incident is one alert and one clip. It closes 4 s after the last active factor and is split at 20 s so clips stay short. |
 | `localize.py` | Turns a map into a circle: upsample, keep the connected region of at least 0.7 x peak around the peak, take the mass-weighted centre, set the radius from the region's area, then clamp it. Also holds the circle/box geometry used for evaluation. |
 | `escalation.py` | `EscalationPolicy`, `SamRefiner` (SAM 3.1), `MuseVerifier` (Muse Spark) and `Escalator` (thread pool, never blocks the live loop). |
+| `verify_gate.py` | F2 and F5 Muse Spark verify gates: one batched request from the last few above-trigger seconds, 2-of-3 vote, fail closed, SAM 3.1 circles for the head and the torso. |
+| `verify_gate_eval.py` | CLI that scores that same prompt on a folder of still frames (`--factor F2` or `F5`). |
 | `storage.py` | Ring buffer, H.264 clip writer (ffmpeg pipe, OpenCV fallback), `EventStore` (folders and SQLite). |
 | `service.py` | `SightlinePipeline.process(source, camera_id, on_event, stop)`: the reusable service the backend calls, one instance per camera. |
 | `run.py` | The CLI. |
@@ -51,6 +53,10 @@ $PY -m sightline_pipeline.run --source data/demo/sightline_demo.mp4 --fast   # a
 $PY -m sightline_pipeline.run --source data/demo/sightline_demo.mp4 --loop   # virtual camera, runs until stopped
 $PY -m sightline_pipeline.run --source rtsp://<phone-ip>:8554/<path> --camera-id phone_cam   # Android IP-camera app
 $PY -m sightline_pipeline.eval_circles                                # circle metrics -> sightline_pipeline/results/
+$PY -m sightline_pipeline.verify_gate_eval --frames <dir> --labels labels.csv --factor F5 --dry-run
+# labels.csv is file,vest for F5 (1 = wearing hi-vis) or file,head for F2 (1 = wearing head protection).
+# Omit --dry-run to call Muse Spark 1.3 Contributor (muse-spark-1.3-contributor).
+# --model overrides that id. --batch-size 1 or 3. --show-raw prints the model answer, not the key.
 ```
 
 Options: `--device cuda:1`, `--no-escalation`, `--max-seconds N`, `--config my.yaml` (overrides `config.yaml`), `--data-dir`. Detached launcher with logs in `F:\models\logs`: `F:\models\wsl\run_pipeline_jobs.sh demo|eval|run ...`.
@@ -90,15 +96,24 @@ The policy is explicit, set in `config.yaml` under `escalation`. A factor is esc
 - it's **high severity** (F1 hand in danger zone, F6 fall, F7 unstable load, F10 fire), or
 - the head is **unsure**, meaning its smoothed score is between 1.0 and 1.6 times its threshold.
 
-There are at most 3 escalations per incident and 6 per minute per camera. Everything else is decided by V-JEPA and the head alone.
+There is at most 1 escalation per incident and 2 per minute per camera. Everything else is decided by V-JEPA and the head alone. A hard Meta API budget also caps submitted escalations at 3 per camera session and 30 per local day (`max_per_session` / `max_per_day`, env `SIGHTLINE_ESC_MAX_PER_SESSION` / `SIGHTLINE_ESC_MAX_PER_DAY`); over the cap the event is still saved and the check is recorded as `skipped_budget` with no API call.
 
 1. **SAM 3.1 refinement.** It segments the factor's concept (`hand`, `fire`, `forklift`, `open electrical panel`, `person`) in the peak frame. The head circle is then snapped to the enclosing circle of the SAM box whose centre lies within 1.5 radii of it (`source: "sam3.1"`). Backends:
    - `SAM_BACKEND=api` (default): Meta Model API, `POST /v1/responses` with model `sam-3.1`. The streamed box tokens are parsed (`<|box;x1=..;y1=..|>`) and masks are not decoded.
    - `SAM_BACKEND=local`: open weights from `facebook/sam3.1` (gated, SAM License) through the `sam3` package, with checkpoint `SAM3_CHECKPOINT`.
    - `SAM_BACKEND=off`.
-2. **Muse Spark verdict.** The peak frame, with the circle drawn, goes to `muse-spark-1.3` with the factor definition (`/v1/chat/completions`, image input). It answers with JSON: `{confirmed, severity 1-5, reason, action}`. `MUSE_BACKEND=api|off`, `MUSE_SPARK_MODEL`.
+2. **Muse Spark verdict.** The peak frame, with the circle drawn, goes to Muse Spark 1.3 Contributor (`muse-spark-1.3-contributor`) with the factor definition (`/v1/chat/completions`, image input). It answers with JSON: `{confirmed, severity 1-5, reason, action}`. `MUSE_BACKEND=api|off`. The model id is `MUSE_SPARK_MODEL` if that is set, otherwise `escalation.muse_model`, otherwise `muse-spark-1.3-contributor`.
+3. **F2 and F5 verify gates.** `escalation.verify_gates` (env `SIGHTLINE_VERIFY_GATES=on|off`, and `SIGHTLINE_VERIFY_GATE_F2` / `SIGHTLINE_VERIFY_GATE_F5` for one factor). F2 and F5 are not in `muted_factors`, but the tracker still treats them as gated: they are scored and stored, and they can open or join an incident only through the gate. They are published only after Muse Spark confirms them. F1 is unchanged.
 
-Auth for both is `MODEL_API_KEY` (`META_API_KEY` is accepted as an alias). The base URL comes from `META_API_BASE_URL` and defaults to `https://api.meta.ai/v1`. Without a key, every escalation is still recorded with the reason it fired and `status: "skipped_no_key"`. Network errors are stored as `status: "error"`. Escalation never stops the live loop.
+   When the smoothed score crosses the factor's trigger (F5 default 0.15, F2 default 0.5) the pipeline keeps that frame, with the stream time and the smoothed score. F2's threshold is 0.5 because h3_wide F2 scores sit around 0.72-0.76 on the Pexels bare-head clip and 0.89-1.0 on the demo; Glimmer labelled F2 present on about 80% of clips, so the head score is only a person-present trigger and Muse decides. At incident close, factors that triggered and have not been checked yet go out in **one** Muse Spark 1.3 Contributor (`muse-spark-1.3-contributor`) chat completion. The frames are not spread across the whole incident or the pre-roll. Up to `max_frames` (default 3) JPEGs, long side 768, come only from where every requested factor's smoothed score was still at or above its trigger, spread across the last `recent_s` seconds (default 3) of that stretch: the frames just before the gate fires. If none qualify, the factor fails closed with `no_frames`. The prompt asks only the questions for those factors. Per frame the JSON is `{person_visible, wearing_hi_vis_vest}` for F5 and/or `{person_visible, wearing_head_protection}` for F2. Head protection means a hard hat, safety helmet or bump cap. A normal cap, hood, hair net or bare head is not head protection. If no person or head is visible, or the model is unsure, it answers true (protected) so the vote fails closed.
+
+   A factor alerts only when at least `min_votes` (default 2) frames have `person_visible: true` and the protective item false. Frames with no visible person do not count. A missing key, HTTP error, timeout, empty reply, bad JSON or the wrong frame count fails closed and does not publish that factor. The reply is not retried. On a failure the gate record and the Muse call store a diagnostic: HTTP status, `finish_reason`, usage token counts when the response included them, and the first 1500 characters of the assistant content and of `reasoning` or `reasoning_content`. Headers and the API key are not stored. `max_tokens` defaults to 4000 because reasoning tokens count against that budget. The verdict is cached per incident and per factor, so the same factor is not asked twice. The request takes one slot through `EscalationPolicy.reserve` and `EscalationBudget` (`max_per_incident` 1, `max_per_minute` 2, `max_per_session` 3, `max_per_day` 30). A refusal is stored as `skipped_budget` with reason `incident_cap`, `minute_cap`, `session_cap` or `daily_cap`, and the factor is not published. No API key records `skipped_no_key` and spends nothing.
+
+   After Muse confirms a factor, SAM 3.1 runs in that same budget slot, on one frame (a frame Muse marked hazardous, otherwise the newest sample). Prompts are short nouns: the live demo got no box for `bare head` and `person head without helmet`, while `head` and `person` return boxes. F2 tries `head`, then `person`. A `head` box is the F2 circle. A `person` box becomes an F2 circle on the top 20% of the box, centred horizontally, with the radius taken from the box width. F5 tries `person` and circles the torso: the box's centre x, 40% of the way down the box, radius from the box width, clamped to the localization min and max radius. Boxes are cached per frame and prompt inside that evaluation, so `person` is sent once even when F2 and F5 both need it. The highest-confidence box is used, and the largest box breaks a tie. `escalation.verify_gates.api_calls.sam` counts real SAM requests, not cache hits. The frame SAM ran on is stored as `sam_t_stream`. Its circle replaces the head-map circle only on overlays within `sam_hold_s` (default 1.5 s) of that frame, which is what `event.json` and `clip_circles.mp4` both draw. Overlays farther away keep the factor and drop the circle, so a person who has moved is not circled on empty floor. If SAM returns nothing or errors, the head-map circle is kept on every overlay with source `head_map_fallback`. Each factor records `circle_source` (`sam3.1` or `head_map_fallback`), `sam_t_stream`, `sam_status`, `sam_prompt`, and how many boxes each prompt returned. When every published factor is gated and SAM drew a circle, `thumb.jpg` is that SAM frame with the SAM circles, and `peak_t_stream` is `sam_t_stream`. An F1 incident still uses its risk-peak frame.
+
+   The record is `escalation.verify_gates`: `{factors: {F2|F5: {status, votes, n_frames, reason, verified_by, circle_source, sam_t_stream, sam_status, sam_prompt, sam_boxes}}, api_calls: {muse, sam}, suppressed: [...]}`. A failure also stores `diagnostic` on that object and on the Muse call. `status` is `confirmed`, `rejected`, `failed`, `skipped_budget` or `skipped_no_key`. A confirmed factor sets top-level `verified_by` to `Muse Spark`. If every factor in the incident was gated and none was confirmed, the clip is still written with `status: suppressed` and `on_event` is not called. The gate does nothing when escalation is disabled (`verify_gates_ignored`).
+
+Auth for both is `MODEL_API_KEY` (`META_API_KEY` is accepted as an alias). The base URL comes from `META_API_BASE_URL` and defaults to `https://api.meta.ai/v1`. Without a key, every escalation is still recorded with the reason it fired and `status: "skipped_no_key"`. Network errors are stored as `status: "error"`. Escalation never stops the live loop. With the verify gates on and no key, F2 and F5 are recorded and not published.
 
 ## Results (2026-10-31, RTX 3090)
 
@@ -136,24 +151,37 @@ Attention points at the hand almost every time, but its circles are too small. T
 - **high severity:** F7 twice, F1 once
 - **unsure score:** F9 three times, at score/threshold 1.33-1.45
 
-The policy skipped the rest: F9 at 5.1x and F8 at 1.66x its threshold were confident, and F6 was rate-limited by the 6-per-minute cap. All are recorded with `skipped_no_key`, because no Meta Model API key is configured. The SAM 3.1 and Muse Spark calls are implemented against the documented API, but they haven't been tested live.
+The policy skipped the rest: F9 at 5.1x and F8 at 1.66x its threshold were confident, and F6 was rate-limited by the 6-per-minute cap. All are recorded with `skipped_no_key`, because no Meta Model API key is configured. That run had no API key. SAM 3.1 and Muse Spark have run live since Nov 4 (next section).
+
+## Live verify-gate results (2026-11-04, simulated RTSP camera into the backend)
+
+| Clip | Gate result | Circles |
+|---|---|---|
+| Factory scene of `data/demo/sightline_demo.mp4` (workers without helmets or vests) | F2 and F5 confirmed, 3 of 3 frames | SAM 3.1 `head` circle on the worker's bare head |
+| Pexels 8987012, angle grinder (`data/demo_extra/`) | F2 and F5 confirmed, 3 of 3 frames; F1 from the head | SAM head circle, SAM torso circle, F1 circle on the hand |
+| Table-saw close-up of the demo video (only hands visible) | Rejected, 0 of 3 frames | none (correct fail-closed) |
+
+- **Budget:** with the session cap of 3, exactly 3 Meta API slots were used per camera session; every later incident was stored as `skipped_budget` (`session_cap`) while F1 kept alerting.
+- **Bugs found live and fixed:** frames sampled from the pre-roll (empty frames led to rejections), long SAM prompts returning no box, one SAM circle pasted over a whole clip with moving people, and a misleading `minute_cap` reason after the session cap.
+- **Timeout:** one Muse request hit the 30 s timeout and failed closed (`failed`, not published).
 
 ## Configuration choices for live use (and why)
 
 - **Thresholds** are the validation-chosen ones saved in the head checkpoint (`h3_wide`), with a floor of 0.05. **F6 and F7 are raised to 0.5**: their validation thresholds (0.026 and 0.007) were picked on whole clips with up to 8 windows pooled, from very few validation positives, while live runs pool 2 windows.
-- **F2 (no head protection) and F5 (no hi-vis) are muted.** They're scored and stored but never open an incident. About 80% of their training labels are "present", and F2 can't be evaluated, so they would alert on almost every frame.
+- **F2 (no head protection) and F5 (no hi-vis) are verify-gated.** They're scored and stored, and they can open an incident only through `escalation.verify_gates`. About 80% of their training labels are "present", so the head score is only a person-present trigger. Muse Spark decides, and a factor is published only when Muse confirms it. F6-F10 stay in `muted_factors`.
 - **F3 and F4 are hidden** because they're untrained. F11 isn't a head output.
 
 ## Known limits
 
-- **Only F1 (hand in danger zone) is reliable live.** In our demo run, the other factors (F6-F9) raised confident (0.98-0.99) false positives. Their offline AUROC was measured on same-source test clips with weak labels and did not carry over. Scores are not calibrated. Treat non-F1 alerts as experimental.
-- **Circles are validated only for F1** (table-saw hands). The F7/F8/F9/F6/F10 circles come from the head's MIL attention, which was trained with clip-level labels only. Looking at the demo, F7 and F9 circles can land on the wrong object, such as a bright floor reflection instead of the forklift load. SAM 3.1 refinement is meant to fix this on escalation but hasn't been tested without an API key. Each event records which factors have validated localization (`localization`).
+- **Only F1 (hand in danger zone) alerts from the head score alone;** F2 and F5 need a Muse Spark confirmation. In our Oct 31 demo run, the other factors (F6-F9) raised confident (0.98-0.99) false positives. Their offline AUROC was measured on same-source test clips with weak labels and did not carry over. Scores are not calibrated. Treat non-F1 alerts as experimental.
+- **Circles are validated only for F1** (table-saw hands). The F7/F8/F9/F6/F10 circles come from the head's MIL attention, which was trained with clip-level labels only. Looking at the demo, F7 and F9 circles can land on the wrong object, such as a bright floor reflection instead of the forklift load. SAM 3.1 now runs live with a key and gives good F1 hand, F2 head and F5 torso circles; the F6-F10 circles are still unvalidated. Each event records which factors have validated localization (`localization`).
 - **False positives on the demo:** F9 (open panel) fires at the start of a safe-walkway clip and on the table saw, and F6 (fall) fires on the table-saw frames.
 - The demo footage comes from the same two datasets the head was trained on, from their held-out test splits. Out-of-distribution performance on real workshop cameras is untested.
 
 ## Future improvements
 
-- Permissive PPE and fire/smoke datasets to make F2-F5 and F10 trustworthy, then unmute F2/F5.
+- F2/F5 from the head alone: retrains on Muse-labelled video learned the video source instead of the helmet (see [`../training/08-video-ppe`](../training/08-video-ppe/README.md) and [`PPE_SHORTCUT.md`](../training/04-head/results/PPE_SHORTCUT.md)). Next: same-camera, paired helmet / no-helmet and vest / no-vest footage, then a partial V-JEPA 2.1 fine-tune.
+- Fire/smoke data with a permissive licence for F10.
 - A small hand-labeled, out-of-distribution test set from real workshop cameras, giving honest per-factor and circle numbers.
 - Train F3 (eye protection) and F4 (gloves).
 - Patch-level supervision (boxes or SAM 3.1 pseudo-masks) for F6-F10, so their circles can be validated the way F1's are.
@@ -162,7 +190,7 @@ The policy skipped the rest: F9 at 5.1x and F8 at 1.66x its threshold were confi
 
 ## Tests
 
-`python -m pytest sightline_pipeline/tests -q` runs 28 offline tests with no GPU: ingest pacing, loop and reconnect, events (hysteresis, merging, max length, muted/hidden factors), circle geometry, storage and SQLite, escalation policy and parsing, the no-key fallback, an end-to-end service run with a fake model that writes real clips and events, and the `on_step` live-view hook.
+`python -m pytest sightline_pipeline/tests -q` runs the offline tests with no GPU: ingest pacing, loop and reconnect, events (hysteresis, merging, max length, muted/hidden factors), circle geometry, storage and SQLite, escalation policy and parsing, the no-key fallback, the F2/F5 verify gates with mocked HTTP (2-of-3 vote, frames without a person, fail closed on errors and timeouts, one combined request, per-incident cache, budget caps and skip reasons, SAM head/torso circles and the head-map fallback, the +-1.5 s circle window, the SAM-frame thumbnail, and the Muse model id), an end-to-end service run with a fake model that writes real clips and events, and the `on_step` live-view hook.
 
 ## Data and licences
 

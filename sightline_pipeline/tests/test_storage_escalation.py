@@ -2,8 +2,8 @@ import json
 
 import numpy as np
 
-from sightline_pipeline.escalation import (EscalationPolicy, MuseVerifier, SamRefiner, parse_sam_boxes,
-                                           parse_verdict, pick_box, refine_circle)
+from sightline_pipeline.escalation import (EscalationPolicy, MuseVerifier, SamRefiner,
+                                           parse_sam_boxes, parse_verdict, pick_box, refine_circle)
 from sightline_pipeline.localize import Circle
 from sightline_pipeline.storage import ClipWriter, EventStore, RingBuffer, resize_w
 
@@ -53,7 +53,7 @@ def test_policy():
     assert not ok and why.startswith("confident")
     assert pol.decide("F1", 0.9, 0.1, 2, 3.0) == (False, "incident_cap")
     assert pol.decide("F1", 0.9, 0.1, 0, 4.0) == (True, "high_severity")
-    assert pol.decide("F1", 0.9, 0.1, 0, 5.0) == (False, "rate_limited")
+    assert pol.decide("F1", 0.9, 0.1, 0, 5.0) == (False, "minute_cap")
     assert pol.decide("F1", 0.9, 0.1, 0, 70.0)[0]
 
 
@@ -89,3 +89,11 @@ def test_backends_skip_without_key(monkeypatch):
     assert MuseVerifier().verify(img, "F1", 0.9, 0.1) == {"status": "skipped_no_key"}
     monkeypatch.setenv("SAM_BACKEND", "off")
     assert SamRefiner().status() == "off"
+
+
+def test_f1_policy_is_unchanged_and_f5_is_not_auto_escalated():
+    pol = EscalationPolicy(("F1",), (1.0, 1.6), max_per_incident=1, max_per_minute=2)
+    assert pol.decide("F1", 0.99, 0.1, 0, 0.0) == (True, "high_severity")
+    assert pol.decide("F1", 0.99, 0.1, 1, 1.0) == (False, "incident_cap")
+    assert pol.decide("F5", 0.99, 0.1, 0, 0.0)[1].startswith("confident")
+    assert pol.decide("F2", 0.99, 0.1, 0, 1.0)[1].startswith("confident")
