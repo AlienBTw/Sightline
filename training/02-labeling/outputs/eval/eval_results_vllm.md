@@ -1,5 +1,7 @@
 # Glimmer label eval (2026-10-31T13:20:22+01:00)
 
+23-clip probe of the server used for the full run: vLLM, tensor parallel, `RedHatAI/Muse-Glimmer-30B-INT4` served as `muse-glimmer-30b-int4-vllm`.
+
 | Config | F7 P / R / unc | F8 P / R / unc | F9 P / R / unc | Uncertain (all F1–F10) | Present (all) | s/call (mean) | calls/min |
 |---|---|---|---|---|---|---|---|
 | v2:none | 1.00 / 0.75 / 0.00 | 0.50 / 0.80 / 0.00 | 1.00 / 0.25 / 0.00 | 0.28 | 0.23 | 54.54 | 13.20 |

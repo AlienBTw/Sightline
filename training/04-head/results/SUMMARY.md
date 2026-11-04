@@ -1,5 +1,7 @@
 # 04-head results summary
 
+These rows are the initial head, trained on stage 1 weak labels from local Muse Glimmer 30B 4-bit (`RedHatAI/Muse-Glimmer-30B-INT4`) on vLLM. Stage 2 PPE retrains (SAM 3.1 boxes + Muse Spark 1.3 Contributor) are in [`PPE_SHORTCUT.md`](PPE_SHORTCUT.md).
+
 Cells: AUROC / AP (positives/labeled clips). Uncertain labels are excluded; F3/F4 are masked out of training.
 
 ### Voxel51 official test split (117 unique clips)

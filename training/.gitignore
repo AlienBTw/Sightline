@@ -1,6 +1,6 @@
 # Everything heavy or regenerable stays out of git. READMEs, configs, scripts
 # and small result files (metrics, weak labels) are committed. Personal
-# progress notes (JOURNAL, LOGs, report notes, split write-up) stay local.
+# local notes stay out of git.
 
 # Datasets, caches and run logs
 data/

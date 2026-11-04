@@ -8,7 +8,7 @@ protocols, and to test what happens when cameras misbehave.
 | [MediaMTX](https://github.com/bluenviron/mediamtx) v1.21.3 | RTSP server acting as the camera/NVR (RTSP over TCP and UDP/RTP, Basic + Digest auth) | MIT |
 | [FFmpeg](https://ffmpeg.org) static build ([BtbN](https://github.com/BtbN/FFmpeg-Builds), GPL) | the camera encoders: H.264 / H.265, OSD clock, packet loss | GPL (tool only, not shipped) |
 
-Binaries are downloaded on first run to `$CAMSIM_BIN` (default `F:\models\camsim\bin`, outside git).
+Binaries are downloaded on first run to `$CAMSIM_BIN` (a directory outside the repo).
 
 ## Streams it publishes
 
@@ -28,7 +28,7 @@ Every stream has a camera-style OSD (name + clock). Both transports work: the ba
 ## Run it
 
 ```powershell
-# Windows (runs inside WSL, detached; logs + PIDs in F:\models\logs\camsim)
+# Windows (runs inside WSL, detached; logs and PIDs stay outside the repo)
 powershell -ExecutionPolicy Bypass -File tools\camera_sim\start_sim.ps1           # server + 4 cameras
 powershell -ExecutionPolicy Bypass -File tools\camera_sim\stop_sim.ps1 -Distro Ubuntu-24.04 pub 201    # unplug camera 2
 powershell -ExecutionPolicy Bypass -File tools\camera_sim\start_sim.ps1 -Distro Ubuntu-24.04 pub 201   # plug it back in
@@ -57,7 +57,7 @@ curl -X POST http://127.0.0.1:8000/api/cameras -H "Authorization: Bearer $TOKEN"
 
 `tools/camera_sim/backend_check.py` does this for three cameras (H.264 TCP, H.265 TCP, sub-stream UDP),
 checks snapshot + MJPEG live view, status and events, then deletes them. `run_backend_test.sh` starts a
-throwaway backend for it (random admin password in `F:\models\camsim\backend_test\creds`, never `.env`).
+throwaway backend for it (a random admin password in a credentials file outside the repo, never `.env`).
 
 Automated test: `pytest -m integration sightline_pipeline/tests/test_camera_sim_integration.py` starts
 MediaMTX + an ffmpeg camera on port 18554 and checks TCP, UDP, wrong password and wrong path. It is
@@ -138,7 +138,7 @@ brand-specific RTSP path.
   started by `bash tools/camera_sim/start_onvif.sh` after `start_sim.sh`. It answers WS-Discovery on
   239.255.255.250:3702 and serves the device + media services on `http://<wsl-ip>:8081/onvif/device_service`,
   with a main profile (→ `Streams/101`, 1080p25 H.264) and a sub profile (→ `Streams/102`, 360p15) through its
-  RTSP proxy on port 8564. Node 22 and the server are fetched to `F:\models\camsim\` on first run.
+  RTSP proxy on port 8564. Node 22 and the server are fetched next to the simulator binaries on first run.
 - **Client:** `backend/onvif.py`, plain SOAP over httpx (no WSDL/zeep): WS-Discovery Probe (multicast,
   plus optional unicast to listed hosts for networks that drop multicast), `GetCapabilities`,
   `GetDeviceInformation`, `GetProfiles`, `GetStreamUri`, with WS-Security UsernameToken (PasswordDigest).

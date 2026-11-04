@@ -26,9 +26,11 @@ Every escalation (SAM 3.1 + Muse Spark, counted as one slot) is capped: **1 per 
 | Model | Where it runs | What it does |
 |---|---|---|
 | **V-JEPA 2.1** ViT-L/16 384 (open weights, MIT) | Locally on the GPU, always on | Video features for the concept-bottleneck head (16-frame windows) |
-| **SAM 3.1** (`sam-3.1`) | Meta Model API, only on escalation | Snaps circles to the hand (F1), head (F2) and torso (F5) |
-| **Muse Spark 1.3 Contributor** (`muse-spark-1.3-contributor`) | Meta Model API, only on escalation | Verdict for flagged incidents, the F2/F5 2-of-3 verify gate, and offline F2/F5 labels for 383 video clips ([`training/08-video-ppe`](training/08-video-ppe/README.md)) |
-| **Muse Glimmer 30B** (Apache 2.0) | Locally, offline | Weak clip labels for F1-F10 ([`training/02-labeling`](training/02-labeling/README.md)) |
+| **SAM 3.1** (`sam-3.1`) | Meta Model API on escalation; local weights for offline boxes | Snaps live circles to the hand (F1), head (F2) and torso (F5). Stage 2 labelling: boxes on the PPE video clips |
+| **Muse Spark 1.3 Contributor** (`muse-spark-1.3-contributor`) | Meta Model API, on escalation and for offline PPE labels | Verdict for flagged incidents, the F2/F5 2-of-3 verify gate, and the stage 2 relabel of the PPE video clips (helmet/vest), together with the SAM 3.1 boxes ([`training/08-video-ppe`](training/08-video-ppe/README.md)) |
+| **Muse Glimmer 30B** 4-bit, `RedHatAI/Muse-Glimmer-30B-INT4` (Apache 2.0) | Locally, offline, on vLLM (tensor parallel), served as `muse-glimmer-30b-int4-vllm` | Stage 1: weak F1–F10 labels for the initial head ([`training/02-labeling`](training/02-labeling/README.md)) |
+
+Labelling was two stages. **Stage 1:** local Muse Glimmer 30B 4-bit (`RedHatAI/Muse-Glimmer-30B-INT4`), served with vLLM split across both GPUs (tensor parallel) as `muse-glimmer-30b-int4-vllm`, gave weak F1–F10 labels for the initial head. **Stage 2:** SAM 3.1 boxes plus Muse Spark 1.3 Contributor (Meta Model API) relabelled the PPE video clips (helmet and vest) to fix the source shortcut. Ollama (`muse-glimmer:30b`) and SGLang were earlier attempts and did not produce the full label set.
 
 ## How it was built
 
@@ -87,8 +89,8 @@ powershell -ExecutionPolicy Bypass -File scripts\build-apk.ps1    # release APK
 | Hazard head | Concept-bottleneck: 11 hazard factors (F1–F11) → risk; per-patch activations → circle/ellipse overlay |
 | Anomaly (F11) | V-JEPA prediction error |
 | Escalation only | **SAM 3.1** (mask) + **Muse Spark 1.3 Contributor** (`muse-spark-1.3-contributor`, reasoning) via the Meta Model API |
-| Offline labeling | **Muse Glimmer 30B** (Apache 2.0, Q4) through **Ollama**, OpenAI-compatible at `http://localhost:11434/v1` |
-| Offline PPE video labels | **Muse Spark 1.3 Contributor** clip verdicts for F2/F5 ([`training/08-video-ppe`](training/08-video-ppe/README.md)) |
+| Offline labeling (stage 1) | **Muse Glimmer 30B** 4-bit (`RedHatAI/Muse-Glimmer-30B-INT4`, Apache 2.0) served with **vLLM**, tensor parallel, name `muse-glimmer-30b-int4-vllm`. Weak F1–F10 labels for the initial head |
+| Offline PPE video labels (stage 2) | **SAM 3.1** boxes + **Muse Spark 1.3 Contributor** (`muse-spark-1.3-contributor`, Meta Model API) relabel helmet/vest clips to fix the source shortcut ([`training/08-video-ppe`](training/08-video-ppe/README.md)) |
 | UI / API | Streamlit + FastAPI + SQLite |
 
 ## Legacy MVP stack (pre-event reference)
@@ -174,7 +176,7 @@ The UI never loads detector or VLM weights. `GET /system` reports torch/device i
 
 ## Limitations and future work
 
-- **F2/F5 need Muse Spark.** Retraining the head on Muse-labelled video learned the video source, not the helmet: on held-out Pexels clips F2 AUROC stayed at 0.19-0.58 while the head separated Voxel51 from Pexels clips at domain AUROC 0.54-1.00 (most runs 0.97-1.00). Details: [`training/04-head/results/PPE_SHORTCUT.md`](training/04-head/results/PPE_SHORTCUT.md) and [`training/08-video-ppe`](training/08-video-ppe/README.md). `h3_wide` stays live and the verify gates decide F2/F5.
+- **F2/F5 need Muse Spark.** Retraining the head on Muse-labelled video learned the video source, not the helmet: on held-out Pexels clips F2 AUROC stayed at 0.19-0.58 while the head separated Voxel51 from Pexels clips at domain AUROC 0.54-1.00 (most runs 0.97-1.00). Stage 2 relabelled those PPE clips with SAM 3.1 boxes and Muse Spark 1.3 Contributor. Details: [`training/04-head/results/PPE_SHORTCUT.md`](training/04-head/results/PPE_SHORTCUT.md) and [`training/08-video-ppe`](training/08-video-ppe/README.md). `h3_wide` stays live and the verify gates decide F2/F5.
 - **Data we still need:** same-camera, paired helmet / no-helmet and vest / no-vest footage, so the source of a clip cannot predict its label, plus a small hand-labelled out-of-distribution test set from real workshop cameras.
 - **Model:** the V-JEPA 2.1 trunk is frozen. A partial fine-tune of its last blocks is planned once paired data exists.
 - **Only F1 is validated from the head alone.** F6-F10 are muted. The demo footage comes from the held-out test splits of the training datasets plus Pexels clips; real-workshop accuracy is untested.
@@ -188,7 +190,7 @@ Code: MIT (see [LICENSE](LICENSE)). **Verify weight licences before going public
 | Component | Package / weights | Notes |
 |---|---|---|
 | V-JEPA 2.1 | `facebookresearch/vjepa2` | MIT |
-| Muse Glimmer 30B | Ollama `muse-glimmer:30b` | Apache 2.0 |
+| Muse Glimmer 30B (stage 1 labels) | `RedHatAI/Muse-Glimmer-30B-INT4`, served as `muse-glimmer-30b-int4-vllm` | Apache 2.0. Ollama `muse-glimmer:30b` was an earlier attempt. The legacy report writer and VLM gate can still use that Ollama tag |
 | SAM 3.1 / Muse Spark 1.3 Contributor | Meta Model API | `muse-spark-1.3-contributor`. Follow the API terms |
 | LLMDet | Hugging Face `iSEE-Laboratory/llmdet_*` | Check model card licence |
 | OWLv2 | Hugging Face OWL-ViT / OWLv2 | Apache-2.0 typical — confirm card |
@@ -196,9 +198,9 @@ Code: MIT (see [LICENSE](LICENSE)). **Verify weight licences before going public
 | HistGB | scikit-learn (BSD) | Local `.joblib` artifact |
 | **Banned** | Ultralytics / YOLO-World / YOLOv8 | AGPL/GPL — not used |
 
-Datasets: only permissive licences (CC BY / CC0 / MIT) because the hackathon rules grant the organisers an any-purpose licence to submissions. See `17-meta-hackathon-rules.md` in the planning folder (outside this repo).
+Datasets: only permissive licences (CC BY / CC0 / MIT) because the hackathon rules grant the organisers a licence to submissions.
 
-Detector backends are selected only via `DETECTOR_BACKEND` — never auto-cascaded.
+**Configuration.** The detector backend is chosen with the `DETECTOR_BACKEND` environment variable.
 
 ## Calibration & clips
 
@@ -207,8 +209,6 @@ Detector backends are selected only via `DETECTOR_BACKEND` — never auto-cascad
 - Capture checklist: [`docs/capture_checklist.md`](docs/capture_checklist.md)
 - Clips go under `data/clips/` (gitignored). Only film people who agreed to be filmed.
 
-## Development
+## Security
 
-- All product code lives in this repository.
-- Local `progress/` trackers are gitignored (team status only).
-- Never commit `.env`, API keys, RTSP passwords, or raw site footage.
+Secrets (API keys, camera passwords) go in a local `.env` file. Copy `.env.example` to start.

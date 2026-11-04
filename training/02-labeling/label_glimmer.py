@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Phase 02 - weak labels for F1-F10 from Muse Glimmer 30B (local: Ollama GGUF Q4 or SGLang INT4).
+"""Phase 02 - weak labels for F1-F10 from local Muse Glimmer 30B 4-bit (RedHatAI/Muse-Glimmer-30B-INT4 on vLLM).
 
 For every clip in data/manifest.jsonl:
   1. sample K keyframes (uniform, centre of K equal segments; images = 1 frame)

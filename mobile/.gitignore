@@ -11,7 +11,7 @@ expo-env.d.ts
 /android
 /ios
 
-# Native / signing (the release keystore and its passwords live outside the repo, in F:\models\keys)
+# Native / signing (the release keystore and its passwords live outside the repo)
 .kotlin/
 *.orig.*
 *.jks

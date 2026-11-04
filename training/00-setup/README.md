@@ -19,12 +19,12 @@ The script prints the Python version, key packages, GPUs (through torch), Ollama
 - Python ≥ 3.11
 - `numpy`, `opencv-python-headless`, `PyYAML`, `pytest` (from `training/requirements.txt`)
 - PyTorch with CUDA for phases 03–04
-- Ollama serving `muse-glimmer:30b` for phase 02, on the OpenAI-compatible endpoint `http://localhost:11434/v1`
+- Stage 1 labelling: vLLM serving `RedHatAI/Muse-Glimmer-30B-INT4` as `muse-glimmer-30b-int4-vllm` (tensor parallel on both GPUs). `check_env.py` also prints Ollama models. Ollama `muse-glimmer:30b` was an earlier attempt, not the full run
 - Disk space: Voxel51 needs about 9.3 GiB (10.0 GB). Zenodo needs about 38.6 GiB of parts plus about as much again once extracted.
 
 ## Results
 
-Oct 30, 22:30: on the training PC, `check_env.py` → **OK**. It found Python 3.11.8, torch 2.6.0+cu124, 2× RTX 3090 (24 GiB), Ollama serving `muse-glimmer:30b`, and 146 GiB free.
+Oct 30, 22:30: on the training PC, `check_env.py` → **OK**. It found Python 3.11.8, torch 2.6.0+cu124, 2× RTX 3090 (24 GiB), Ollama serving `muse-glimmer:30b`, and 146 GiB free. That Ollama tag was an earlier attempt. The full labelling run later used vLLM and `RedHatAI/Muse-Glimmer-30B-INT4`.
 
 ## Known issues
 

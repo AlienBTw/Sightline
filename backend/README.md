@@ -57,7 +57,7 @@ Or inside WSL: `bash backend/scripts/run_backend.sh` (foreground), `bash backend
 
 - The backend listens on `127.0.0.1:8000` in WSL. WSL forwards localhost, so Windows (and ngrok) reach it at `http://127.0.0.1:8000`.
 - The dev console is at `http://127.0.0.1:8000/console/`.
-- Logs go to `F:\models\logs`:
+- Logs go to the directory in `SIGHTLINE_LOG_DIR` (Windows scripts also read `SIGHTLINE_LOG_DIR_WIN`):
   - `backend.log` is the app log, rotated at 10 MB, keeping 5 files.
   - `backend_stdout.log` holds uvicorn warnings and tracebacks, rotated at 20 MB when the backend starts.
   - The PID file is `sightline_backend.pid`.
@@ -86,7 +86,7 @@ Or inside WSL: `bash backend/scripts/run_backend.sh` (foreground), `bash backend
 | `SIGHTLINE_LOGIN_PER_MINUTE` / `SIGHTLINE_API_PER_MINUTE` | 5 / 600 | Rate limits per IP. Login also allows 30 per hour per IP and 10 per 15 min per username |
 | `SIGHTLINE_MJPEG_MAX_SECONDS` / `SIGHTLINE_PREVIEW_QUALITY` | 300 / 60 | Length of one live-view session, and JPEG quality |
 | `SIGHTLINE_API_DOCS` | 0 | `1` serves OpenAPI at `/api/docs` |
-| `SIGHTLINE_LOG_DIR` | set by `run_backend.sh` to `/mnt/f/models/logs` | Directory for the rotating app log |
+| `SIGHTLINE_LOG_DIR` | a directory outside the repo | Rotating app log. The PowerShell scripts use `SIGHTLINE_LOG_DIR_WIN` for the same folder |
 | `SIGHTLINE_HOST` / `SIGHTLINE_PORT` | 127.0.0.1 / 8000 | Bind address, used by `run_backend.sh` |
 
 The pipeline's own variables still apply: `MODEL_API_KEY`, `SAM_BACKEND`, `MUSE_BACKEND`, `MUSE_SPARK_MODEL` (Muse Spark 1.3 Contributor, `muse-spark-1.3-contributor`), `SIGHTLINE_ESCALATION`, `SIGHTLINE_VERIFY_GATES`, `SIGHTLINE_VERIFY_GATE_F2`, `SIGHTLINE_VERIFY_GATE_F5` and `SIGHTLINE_DATA_DIR`. See `.env.example`. F2 (no head protection) and F5 (no hi-vis vest) are published only after Muse Spark confirms them; the event's `verified_by` field and `escalation.verify_gates` carry the badge.
@@ -143,7 +143,7 @@ ngrok isn't installed on the build PC yet (checked Oct 31).
 
 1. Install it with `winget install ngrok.ngrok`, then sign up at ngrok.com.
 2. Store the authtoken in ngrok's own config, outside the repo: `ngrok config add-authtoken <token>`, which writes `%LOCALAPPDATA%\ngrok\ngrok.yml`. Alternatively, set it as a user env var, `NGROK_AUTHTOKEN`.
-3. Start the tunnel with `backend\scripts\start_ngrok.ps1`, which runs `ngrok http 8000` on your account's free static dev domain (`https://<name>.ngrok-free.app`). Set `$env:SIGHTLINE_NGROK_URL` to pin it. The log goes to `F:\models\logs\ngrok.log`.
+3. Start the tunnel with `backend\scripts\start_ngrok.ps1`, which runs `ngrok http 8000` on your account's free static dev domain (`https://<name>.ngrok-free.app`). Set `$env:SIGHTLINE_NGROK_URL` to pin it. The log is `ngrok.log` in the log directory.
 4. Put that HTTPS URL in the app build as the API base URL. The app must use HTTPS/WSS only.
 5. Browsers get ngrok's interstitial page once (it's then remembered for 7 days). Apps and API clients aren't affected, and the header `ngrok-skip-browser-warning: 1` skips it as well.
 6. Watch your usage on the ngrok dashboard. If judges use it heavily, upgrade the plan for Nov 4-8 rather than shrinking the demo.
@@ -153,7 +153,7 @@ ngrok isn't installed on the build PC yet (checked Oct 31).
 - **Scheduled tasks:** `backend\scripts\register_tasks.ps1` registers three tasks for the current user:
   - "Sightline Backend": starts the backend at logon.
   - "Sightline ngrok": starts ngrok at logon.
-  - "Sightline Watchdog": runs every 5 minutes. After 2 failed `/health` checks it restarts the backend, and it restarts ngrok if ngrok isn't running. It logs to `F:\models\logs\watchdog.log`, rotated at 5 MB.
+  - "Sightline Watchdog": runs every 5 minutes. After 2 failed `/health` checks it restarts the backend, and it restarts ngrok if ngrok isn't running. It logs to `watchdog.log` in the log directory, rotated at 5 MB.
   - To remove them: `Unregister-ScheduledTask -TaskName "Sightline*" -Confirm:$false`.
 - **Power:** set the Windows power plan to never sleep or hibernate, pause Windows Update for Nov 4-8, and use mains power and a wired network if possible.
 - **External check:** point a free uptime monitor at `https://<name>.ngrok-free.app/health`. The endpoint is public and returns numbers only.

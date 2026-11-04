@@ -6,7 +6,7 @@
 - Upsample the patch activations for the flagged factor, threshold them, take the largest component, and fit a circle or ellipse in frame coordinates
 - Smooth the circle over time across windows
 - Check it against the Zenodo hand boxes for F1 (IoU or centre-in-circle rate)
-- SAM 3.1 is used only on escalations, to refine the area
+- On a live circle, SAM 3.1 refines the area only on escalation. Offline, SAM 3.1 boxes are also stage 2 of the PPE labels (helmet/vest), with Muse Spark 1.3 Contributor; see [`08-video-ppe`](../08-video-ppe/README.md)
 
 ## Where the code is
 Localization is implemented in the live pipeline: [`sightline_pipeline/localize.py`](../../sightline_pipeline/localize.py) (map to circle, geometry) and [`sightline_pipeline/eval_circles.py`](../../sightline_pipeline/eval_circles.py) (evaluation). The full description is in [`sightline_pipeline/README.md`](../../sightline_pipeline/README.md).

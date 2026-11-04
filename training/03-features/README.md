@@ -7,7 +7,7 @@
 - **License: MIT** (repo `LICENSE`; the hub code that loads these checkpoints is MIT-headered). Any-purpose use is allowed with the copyright notice.
 - Source: `https://dl.fbaipublicfiles.com/vjepa2/vjepa2_1_vitl_dist_vitG_384.pt` (5.15 GB, includes predictor + optimizer state). Meta has **not** put 2.1 on Hugging Face yet (vjepa2 issue #137 still open; only community re-uploads exist), so we used the official file. Note: on `main`, `src/hub/backbones.py` points `VJEPA_BASE_URL` at `localhost:8300`, so `torch.hub.load(...)` does not download; we fetch the URL directly and load the encoder ourselves.
 - Why ViT-L: ViT-B is the live/edge candidate, ViT-g/G (1-2 B) would be 3-7x slower for offline extraction. ViT-L is the best quality per second on a 3090 and needs only ~2.6 GiB of allocated VRAM at our batch sizes.
-- `convert_checkpoint.py` keeps only the `ema_encoder` weights (what the official hub loader uses), fp16: `vjepa2_1_vitl_384_encoder_fp16.pt` (609 MB) in `F:\models\vjepa\` and `~/models/vjepa/` (WSL). The raw 5.15 GB file is kept in WSL `~/models/vjepa/`.
+- `convert_checkpoint.py` keeps only the `ema_encoder` weights (what the official hub loader uses), fp16: `vjepa2_1_vitl_384_encoder_fp16.pt` (609 MB), kept with the raw checkpoint outside the repo and under `~/models/vjepa/` in WSL. The raw 5.15 GB file stays in WSL `~/models/vjepa/`.
 - Repo code: `~/vjepa2` (WSL clone of `main`), imported for `app.vjepa_2_1.models.vision_transformer.vit_large` with the hub settings (RoPE, `img_temporal_dim_size=1`, `interpolate_rope=True`).
 
 ## Sampling and outputs
@@ -22,7 +22,7 @@
 
 - Normalization: ImageNet mean/std, fp32 weights under fp16 autocast (pure `.half()` fails: the RoPE path produces fp32 q/k).
 - One `.npz` per item, named by a stable hash key (`item_key()`), plus `index_r<rank>.jsonl` rows (id, split, windows, starts) and `errors_r<rank>.jsonl`.
-- Output: `F:\sightline_features\vjepa2_1_vitl_384\{voxel51,zenodo}\` (not in git; C: is the WSL disk so bulk data stays on F:).
+- Output: `vjepa2_1_vitl_384/{voxel51,zenodo}/` outside the repo (not in git; bulk arrays stay off the system drive).
 - Voxel51 items are the **658 de-duplicated clips** from the weak-label file (one row per byte-identical group), so no clip can appear in both train and test. Zenodo items: Train/Validation/Test (12,183). Augmentation (a copy of Train) and Inpaint (no labels) are skipped.
 
 ## How to run
@@ -30,9 +30,9 @@ WSL env `~/vjepa-venv` (Python 3.12). To avoid a second 3 GB CUDA download it re
 ```bash
 source ~/vjepa-venv/bin/activate
 python convert_checkpoint.py ~/models/vjepa/vjepa2_1_vitl_dist_vitG_384.pt ~/models/vjepa/vjepa2_1_vitl_384_encoder_fp16.pt
-python extract_features.py --limit 10 --out /mnt/f/sightline_features/smoke          # smoke test
-bash /mnt/f/models/wsl/run_extract.sh                                               # 2 detached ranks, one per GPU
-powershell -File F:\models\wsl\check_extract.ps1                                    # status (Windows)
+python extract_features.py --limit 10 --out <feature-dir>/smoke                    # smoke test
+bash scripts/run_extract.sh                                                         # 2 detached ranks, one per GPU
+powershell -File scripts/check_extract.ps1                                          # status (Windows)
 ```
 Resume is automatic: finished `.npz` files are skipped. Launcher/status scripts are copied in `scripts/`.
 
@@ -42,7 +42,7 @@ Resume is automatic: finished `.npz` files are skipped. Launcher/status scripts 
   - Voxel51: 658 clips -> 2,184 windows in ~4.8 min (~2.3 clips/s, ~7.6 windows/s total). Bottleneck is CPU decoding of 1080p H.264 (all 8 WSL cores at ~95%), not the GPUs.
   - Zenodo: 12,183 PNGs in ~8.5 min (~24 images/s total), also decode-bound.
   - Peak allocated VRAM 2.6 GiB per GPU (nvidia-smi 3.8-5.5 GiB incl. context), so there is a lot of headroom for ViT-g or bigger batches.
-  - Disk: 27.7 GiB on F: (about 2 MB per window/image).
+  - Disk: 27.7 GiB (about 2 MB per window/image).
 
 ## Known issues / open questions
 - Time-mean grids lose fine motion order inside a 2.6 s window; `tmean` keeps the per-step global vectors for the temporal factors (F6/F7) and F11 later.

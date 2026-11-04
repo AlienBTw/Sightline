@@ -1,6 +1,6 @@
 # 05 · Eval
 
-**Goal:** honest numbers for each factor and for the risk score, on a de-duplicated test split, plus a check of how good the Glimmer weak labels are.
+**Goal:** honest numbers for each factor and for the risk score, on a de-duplicated test split, plus a check of how good the stage 1 Glimmer weak labels are. Those labels are the vLLM full run (`RedHatAI/Muse-Glimmer-30B-INT4`, served as `muse-glimmer-30b-int4-vllm`), not the earlier Ollama or SGLang attempts.
 
 ## Planned
 - A 10% human spot-check of the Glimmer labels, measuring per-factor agreement. Factors that are too noisy get dropped rather than faked.

@@ -1,4 +1,4 @@
-# Full Glimmer labeling run: vLLM INT4, v2/none, c=32 (2026-10-31)
+# Stage 1 full labelling run: Muse Glimmer 30B 4-bit (`RedHatAI/Muse-Glimmer-30B-INT4`) on vLLM, served as `muse-glimmer-30b-int4-vllm`, tensor parallel, v2/none, c=32 (2026-10-31)
 
 ## Run
 
@@ -60,4 +60,4 @@ None: every row has F1-F10 with a valid label, a confidence in [0, 1] and votes 
 - **F7 and F9 are precise but miss most positives:** F7 P 0.89 / R 0.41 (23/56 forklift-overload clips), F9 P 1.00 / R 0.34 (49/142 opened-panel clips). Keep the class hints for F7/F9 on Voxel51; Glimmer F7/F9 is only a weak extra signal.
 - **F2 / F5 (no helmet / no hi-vis) say present on ~80% of clips** across every class (except Safe Carrying, 4/30). Either the scenes really lack PPE or it is a prompt bias; check in the 05-eval spot check before training on them.
 - **F3 / F4 carry no signal:** 99% uncertain at clip level (96% / 93% of frames).
-- **Very few positives:** F6 9, F10 9, F1 29 (21 of them on Opened Panel Cover), F3 7, F4 0. These factors need other data (PPE / fire sets, Zenodo hands, Alien's own clips).
+- **Very few positives:** F6 9, F10 9, F1 29 (21 of them on Opened Panel Cover), F3 7, F4 0. These factors need other data (PPE / fire sets, Zenodo hands, recorded workshop clips).

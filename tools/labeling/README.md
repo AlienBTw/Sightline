@@ -1,5 +1,7 @@
 # PPE video labelling (F2 no head protection, F5 no hi-vis vest)
 
+Stage 2 of labelling. Stage 1 weak F1–F10 labels came from local Muse Glimmer 30B 4-bit (`RedHatAI/Muse-Glimmer-30B-INT4`) on vLLM (`training/02-labeling`). Here, SAM 3.1 boxes and Muse Spark 1.3 Contributor (Meta Model API) relabel the PPE video clips (helmet and vest) to fix the source shortcut.
+
 Real-video window labels for the concept-bottleneck head. V-JEPA features stay
 frozen. This folder only builds clips, manifests, keyframes, and labels. It
 does not train the head and it does not call a paid API unless you raise the
@@ -13,7 +15,7 @@ is JSON `null`.
 From the repo root in WSL:
 
 ```bash
-cd "/mnt/c/projects/Meta Global AI Developer Hackathon/Sightline"
+# from the repo root, in WSL
 PY=/home/user/vjepa-venv/bin/python
 
 $PY tools/labeling/prep_clips.py
@@ -45,12 +47,12 @@ $PY tools/labeling/sample_frames.py --source voxel51_safe_unsafe
 
 | Footage | Licence | What we record |
 |---|---|---|
-| Pexels clips (`/mnt/f/models/vidlabel/pexels/raw_<id>.mp4`, plus `/mnt/f/models/vest_eval/src/<id>.mp4`) | Pexels License (free use, no attribution required) | `https://www.pexels.com/video/<id>/` in `attribution`, download URL in `url` when `pexels_urls.txt` has it |
+| Pexels clips (raw downloads outside the repo, plus any extra vest-eval sources you pass in) | Pexels License (free use, no attribution required) | `https://www.pexels.com/video/<id>/` in `attribution`, download URL in `url` when `pexels_urls.txt` has it |
 | Voxel51 Safe_and_Unsafe_Behaviours, the 658 sha256-deduped clips phase 03/04 already use | CC BY 4.0 | existing manifest row; official train/test split kept |
 | `data/demo_extra/pexels_8987012_bare_head_grinder.mp4` | Pexels License | replay only, in `ppe_demo_eval.jsonl` |
 | `data/demo/sightline_demo.mp4` | CC BY 4.0 (Voxel51 test clips and Zenodo test frames; see `data/demo/ATTRIBUTION.json`) | replay only |
 
-SAM 3.1 open weights stay on `/mnt/f` under the SAM License. They are not copied into the repo.
+SAM 3.1 open weights stay outside the repo under the SAM License. They are not copied into the repo.
 
 ## Where files go
 
@@ -60,15 +62,15 @@ Repo (small manifests):
 - `training/data/ppe_demo_eval.jsonl` — demo_eval Pexels clips plus the two replay files
 - `training/data/ppe_video_labels.jsonl` — merged F2/F5 labels, Pexels and Voxel51
 
-Outside the repo:
+Outside the repo (the scripts' default output directory):
 
-- `/mnt/f/models/vidlabel/clips/pexels_<id>.mp4` — longest side 1280, about 25 fps, at most 30 s, H.264
-- `/mnt/f/models/vidlabel/frames/<safe id>/w<k>_<j>.jpg` and `frames/index.jsonl`
-- `/mnt/f/models/vidlabel/sam_cache/` — one JSON per keyframe, safe to resume
-- `/mnt/f/models/vidlabel/sam_windows.jsonl`
-- `/mnt/f/models/vidlabel/sam_api_calls.jsonl` — append-only; this script never touches `data/live/escalation_budget.json`
-- `/mnt/f/models/vidlabel/muse_budget.json` — persistent Muse counter
-- `/mnt/f/models/vidlabel/muse_calls.jsonl` and `muse_verdicts.jsonl`
+- `clips/pexels_<id>.mp4` — longest side 1280, about 25 fps, at most 30 s, H.264
+- `frames/<safe id>/w<k>_<j>.jpg` and `frames/index.jsonl`
+- `sam_cache/` — one JSON per keyframe, safe to resume
+- `sam_windows.jsonl`
+- `sam_api_calls.jsonl` — append-only; this script never touches `data/live/escalation_budget.json`
+- `muse_budget.json` — persistent Muse counter
+- `muse_calls.jsonl` and `muse_verdicts.jsonl`
 
 ## Split rule
 
@@ -108,8 +110,8 @@ Voxel51 rows use ids `voxel51/<name>` and their existing train/test split, so th
 
 ## Budgets
 
-- SAM API: `--max-api-calls` defaults to 0. A real run with 0 refuses before any HTTP. `--dry-run` prints the plan and does not log a call. The call log is `/mnt/f/models/vidlabel/sam_api_calls.jsonl`.
-- Muse: `--max-calls` defaults to 0 (this run) and `--budget-total` defaults to 400 (all runs, file `/mnt/f/models/vidlabel/muse_budget.json`). A call is refused when either cap is already reached. The counter increments before the request, so a crash still counts. Parse failures and HTTP errors count as a call and are stored as uncertain. `--dry-run` does not read `.env`, does not send HTTP, and does not touch the counter.
-- Local SAM does not spend either budget. Default GPU is 1, and the process hides every other GPU before torch starts. `--dtype auto` loads bf16 when the GPU supports it, else fp16. The unsloth mirror is a transformers directory (`--checkpoint /mnt/f/models/sam3.1`). `sam3.1_multiplex.pt` is the facebookresearch/sam3 image checkpoint and is not in that mirror.
+- SAM API: `--max-api-calls` defaults to 0. A real run with 0 refuses before any HTTP. `--dry-run` prints the plan and does not log a call. The call log is `sam_api_calls.jsonl` in the output directory outside the repo.
+- Muse: `--max-calls` defaults to 0 (this run) and `--budget-total` defaults to 400 (all runs, file `muse_budget.json` in that directory). A call is refused when either cap is already reached. The counter increments before the request, so a crash still counts. Parse failures and HTTP errors count as a call and are stored as uncertain. `--dry-run` does not read `.env`, does not send HTTP, and does not touch the counter.
+- Local SAM does not spend either budget. Default GPU is 1, and the process hides every other GPU before torch starts. `--dtype auto` loads bf16 when the GPU supports it, else fp16. The unsloth mirror is a transformers directory passed with `--checkpoint`. `sam3.1_multiplex.pt` is the facebookresearch/sam3 image checkpoint and is not in that mirror.
 
 The API key is `MODEL_API_KEY` (or `META_API_KEY`), loaded the same way as `sightline_pipeline.run` (environment, then `.env` with `override=False`). The key is never printed.

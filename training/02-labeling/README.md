@@ -1,12 +1,12 @@
-# 02 · Labeling (Muse Glimmer weak labels)
+# 02 · Labeling (stage 1: Muse Glimmer weak labels)
 
-**Goal:** clip-level weak labels for F1–F10 on every manifest clip, from Muse Glimmer 30B running locally. These labels are the supervision for the concept-bottleneck head (04), trained with multiple-instance learning. F11 isn't labeled here, because it comes from V-JEPA prediction error.
+**Goal:** clip-level weak labels for F1–F10. This is stage 1. Local Muse Glimmer 30B 4-bit (`RedHatAI/Muse-Glimmer-30B-INT4`, Apache 2.0), served with vLLM split across both GPUs (tensor parallel) as `muse-glimmer-30b-int4-vllm`, produced the weak labels for the initial head (04), trained with multiple-instance learning. Stage 2 (SAM 3.1 boxes + Muse Spark 1.3 Contributor on the PPE video clips) is in [`../08-video-ppe`](../08-video-ppe/README.md). F11 isn't labeled here, because it comes from V-JEPA prediction error. Ollama (`muse-glimmer:30b`) and SGLang were earlier attempts and were not the full run.
 
 ## Inputs
 
 - `training/data/manifest.jsonl` (from 01-data)
-- Ollama serving `muse-glimmer:30b` at `http://localhost:11434/v1` (OpenAI-compatible; image in, text out). It can be overridden with `--base-url` / `--model` or the `GLIMMER_BASE_URL` / `GLIMMER_MODEL` environment variables.
-- Or a batched server: `--backend vllm` (used for the full run; `http://localhost:30001/v1`, model `muse-glimmer-30b-int4-vllm`) or `--backend sglang` (port 30000). Server scripts: [`scripts/`](scripts/README.md).
+- vLLM at `http://localhost:30001/v1`, served model `muse-glimmer-30b-int4-vllm` (`--backend vllm`). That is the full run. Server scripts: [`scripts/`](scripts/README.md).
+- Ollama at `http://localhost:11434/v1` and SGLang on port 30000 are earlier attempts only. A run without `--backend` still talks to Ollama, because that is the script default.
 - The prompts [`prompts/factors_v1.md`](prompts/factors_v1.md) and [`prompts/factors_v2.md`](prompts/factors_v2.md) (`v2-7238ea9f`, the one used for the full run), versioned. The factor definitions are filled in from `configs/factors.yaml`.
 
 ## Outputs
@@ -32,18 +32,35 @@
 5. **Hint agreement:** where the dataset class implies a factor (e.g. Safe Walkway Violation → F8 present), the output records whether Glimmer agrees. This is a cheap sanity check on label quality.
 6. Byte-identical duplicate clips are labeled only once. Use `--keep-duplicates` to label every copy.
 
-## How to run (repo root, Ollama running)
+## How to run (repo root)
+
+The full run used `--backend vllm` against `muse-glimmer-30b-int4-vllm`. Start that server first ([`scripts/README.md`](scripts/README.md)).
 
 ```powershell
+python -X utf8 training/02-labeling/label_glimmer.py --backend vllm --sources voxel51_safe_unsafe --prompt training/02-labeling/prompts/factors_v2.md --reasoning-effort none --concurrency 32 --out training/02-labeling/outputs/weak_labels_v2_vllm.jsonl
+python training/02-labeling/summarize_labels.py
 python training/02-labeling/label_glimmer.py --plan-only --limit 3     # no model calls; saves keyframes to cache/glimmer/_preview
-python training/02-labeling/label_glimmer.py --limit 3                 # dry run: 3 clips x 4 frames = 12 calls
-python training/02-labeling/label_glimmer.py --sources voxel51_safe_unsafe
-python -m pytest training/tests -q                                     # offline tests (no Ollama)
+python -m pytest training/tests -q                                     # offline tests
 ```
+
+A dry run without `--backend` still calls Ollama (`muse-glimmer:30b`). That path was an earlier attempt.
 
 Useful flags: `--reasoning-effort none|low|medium|high|default`, `--max-tokens 2048`, `--split train`, `--ids voxel51/0_tr1`, `--keyframes 6`, `--max-side 1024`, `--retries 3`, `--no-json-mode` (for when the server rejects `response_format`), and `--present-threshold 0.6`.
 
 ## Results
+
+### Full run: vLLM INT4, v2/none, concurrency 32 (Oct 31, 13:38-16:14 Tunis)
+
+This is the stage 1 label set. Checkpoint `RedHatAI/Muse-Glimmer-30B-INT4`, served as `muse-glimmer-30b-int4-vllm`, tensor parallel across both GPUs.
+
+Output: `outputs/weak_labels_v2_vllm.jsonl` (658 rows, one per unique Voxel51 clip; train 541 / test 117). Summary: [`outputs/eval/full_run_summary_vllm.md`](outputs/eval/full_run_summary_vllm.md), regenerate with `python training/02-labeling/summarize_labels.py`.
+
+- 658/658 clips, 2,536 new calls + 96 cached frames, **0 errors, 0 malformed rows**, 2 h 36 min at 16.3 calls/min (vs ~7.9 h estimated on the earlier Ollama attempt).
+- Clip-level present / absent / uncertain: F1 29/620/9, F2 528/3/127, F3 7/2/649, F4 0/4/654, F5 513/25/120, F6 9/649/0, F7 26/632/0, F8 629/28/1, F9 120/520/18, F10 9/649/0.
+- Against the class hints: **F7 P 0.89 / R 0.41**, **F8 P 0.73 / R 0.92 but specificity 0.01** (present on 71/72 Safe Walkway clips), **F9 P 1.00 / R 0.34**.
+- Use for the initial head: Glimmer for F1, F2, F5, F6, F10 (after the 05-eval spot check); class hints for F7/F8/F9. F3/F4 (99% uncertain) and F6/F10 (9 positives each) need other data. Stage 2 replaces F2/F5 on the PPE video clips.
+
+### Earlier attempt: Ollama (not the full run)
 
 Training PC, Oct 30 (Tunis), `muse-glimmer:30b` through Ollama 0.40.4, prompt `v1-143ada25`:
 
@@ -67,9 +84,9 @@ Probe on one frame, 900 tokens: JSON mode with default thinking gave cut-off JSO
 
 Evidence on `0_te1` F8 reads like "people on marked pedestrian walkway". Hint agreement is 0/3 confirmed (3 uncertain, 0 contradicted).
 
-**Estimate for a full run (not started):** 658 unique Voxel51 clips × 4 frames = 2,632 calls. At 11.5 s that's about **8.4 h** with reasoning off; at about 22 s it's about 16 h with `low`. Zenodo images (649 now, roughly 25k if fully downloaded) would be 11.5 s each, so they should be sampled, not labeled in full.
+**Earlier Ollama estimate (that full run was not started on Ollama):** 658 unique Voxel51 clips × 4 frames = 2,632 calls. At 11.5 s that's about **8.4 h** with reasoning off; at about 22 s it's about 16 h with `low`. Zenodo images (649 now, roughly 25k if fully downloaded) would be 11.5 s each, so they should be sampled, not labeled in full. The full run used vLLM (above).
 
-### Prompt eval: v1 vs v2, reasoning none vs low (Oct 31, 01:20 Tunis)
+### Prompt eval: v1 vs v2, reasoning none vs low (Oct 31, 01:20 Tunis, earlier Ollama attempt)
 
 | Config | F7 P / R / unc | F8 P / R / unc | F9 P / R / unc | Uncertain, all F1-F10 | Present, all | s/call (mean / median) |
 |---|---|---|---|---|---|---|
@@ -80,35 +97,17 @@ Evidence on `0_te1` F8 reads like "people on marked pedestrian walkway". Hint ag
 
 Eval set: 23 unique Voxel51 clips (`outputs/eval/eval_set.json`), 4 keyframes at 768 px, 92 calls per config. GT clips per factor: F7 7 (4 present / 3 absent), F8 9 (5 / 4), F9 7 (4 / 3). P = precision, R = recall (uncertain counts as a miss), unc = share of hinted clips labeled uncertain. F8 precision of 0.56 equals the base rate: v2/none says F8 present on all 4 Safe Walkway clips too.
 
-**Chosen setting: `v2` prompt (`v2-7238ea9f`), `--reasoning-effort none`.** Full run with it: about 8.1 h for 2,632 calls (about 7.9 h after the cached eval clips). Not started.
-
-### Full run: vLLM INT4, v2/none, concurrency 32 (Oct 31, 13:38-16:14 Tunis)
-
-Output: `outputs/weak_labels_v2_vllm.jsonl` (658 rows, one per unique Voxel51 clip; train 541 / test 117). Summary: [`outputs/eval/full_run_summary_vllm.md`](outputs/eval/full_run_summary_vllm.md), regenerate with `python training/02-labeling/summarize_labels.py`.
-
-- 658/658 clips, 2,536 new calls + 96 cached frames, **0 errors, 0 malformed rows**, 2 h 36 min at 16.3 calls/min (vs ~7.9 h estimated on Ollama).
-- Clip-level present / absent / uncertain: F1 29/620/9, F2 528/3/127, F3 7/2/649, F4 0/4/654, F5 513/25/120, F6 9/649/0, F7 26/632/0, F8 629/28/1, F9 120/520/18, F10 9/649/0.
-- Against the class hints: **F7 P 0.89 / R 0.41**, **F8 P 0.73 / R 0.92 but specificity 0.01** (present on 71/72 Safe Walkway clips), **F9 P 1.00 / R 0.34**.
-- Use for training: Glimmer for F1, F2, F5, F6, F10 (after the 05-eval spot check); class hints for F7/F8/F9. F3/F4 (99% uncertain) and F6/F10 (9 positives each) need other data.
+**Chosen setting: `v2` prompt (`v2-7238ea9f`), `--reasoning-effort none`.** The Ollama estimate for a full run was about 8.1 h for 2,632 calls (about 7.9 h after the cached eval clips). The full run used vLLM instead (above).
 
 ## Known issues
 
 - **Weak on the dataset's own hazard:** v1 never decides F8 (uncertain on 9/9 hinted clips). v2 decides, but says F8 present on safe-walkway clips too (precision 0.56 = base rate), and no frame-vote threshold separates them. F9 recall is 0.25 with both prompts. For Voxel51, use the class hints for F7/F8/F9 and treat Glimmer as the source for the other factors.
-- PPE (F2–F5) came back *uncertain* on 12/12 frames with reasoning off. Going to 1280 px didn't change that and cost no extra time, which suggests the model resizes internally. With `low` it commits.
+- On the earlier 3-clip Ollama probe, PPE (F2–F5) came back *uncertain* on 12/12 frames with reasoning off. Going to 1280 px didn't change that and cost no extra time, which suggests the model resizes internally. With `low` it commits. The vLLM full run is the label set used for the initial head (F2/F5 present on about 80% of clips).
 - Glimmer sometimes appends `<|eot|>` after the JSON. The parser ignores it (tested).
 - Still frames are weak evidence for the motion factors F6 and F7.
 - Cost (measured): about 11.1-11.8 s per call with reasoning off and 21-23 s with `low` (4-config eval, 92 calls each).
 - Weak labels need the 10% human spot-check planned in 05-eval before they're trusted.
 
-## SGLang backend (faster, batched)
+## Earlier attempt: SGLang
 
-- **Server:** WSL2 Ubuntu-24.04, `sglang==0.5.23` in `~/sglang-venv`, started with `F:\models\wsl\serve_sglang.sh` (TP=2 over both 3090s, port 30000, `--reasoning-parser muse`, `--enable-multimodal`).
-- **Weights:** `RedHatAI/Muse-Glimmer-30B-INT4` (GPTQ W4A16 compressed-tensors, Apache-2.0, vision tower unquantized), stored in `F:\models\muse-glimmer-30b-int4-w4a16`. Loads and serves images in SGLang 0.5.23 (verified 2026-10-31) with triton attention, CUDA graphs off and a local multimem patch (`scripts/patch_symm.sh`, `SGLANG_DISABLE_MULTIMEM_AG=1`). Weights are copied to WSL ext4 at `~/models/` for fast loading. Measured on the 23-clip eval (v2/none, concurrency 16): **8.6 calls/min vs 5.4 on Ollama (1.6x)**, but F7 recall 0.50 and F8 recall 0.20 vs 1.00/1.00 on Ollama, so the labels do not match Ollama's quality yet. **Update 13:34:** that SGLang run still had reasoning on (the template has no 'none'; 614 vs 308 completion tokens), so the drop was not the quantization. Use `--backend vllm` instead (server `F:\models\wsl\serve_vllm.sh`, port 30001): it pre-fills the answer channel to skip reasoning, and on the same eval it scored F7 1.00/0.75, F8 0.50/0.80, F9 1.00/0.25 at 13.2 calls/min (c=16) / 21.6 (c=32).
-- **Run:**
-
-```powershell
-python training/02-labeling/label_glimmer.py --backend sglang --concurrency 16 --limit 3
-python training/02-labeling/eval_labels.py --backend sglang --configs v2:none --concurrency 16   # writes outputs/eval/*_sglang.*
-```
-
-- The cache key includes the model name, so Ollama and SGLang answers are kept separate. The INT4 GPTQ weights aren't the same quantization as Ollama's GGUF Q4, so compare the labels on the eval set before switching over.
+SGLang 0.5.23 (tensor parallel, port 30000) was tried on the same INT4 checkpoint and was not used for the full run. On the 23-clip eval (v2/none, concurrency 16): **8.6 calls/min vs 5.4 on Ollama (1.6x)**, but F7 recall 0.50 and F8 recall 0.20 vs 1.00/1.00 on Ollama. That run still had reasoning on (614 vs 308 completion tokens). The vLLM probe on the same eval scored F7 1.00/0.75, F8 0.50/0.80, F9 1.00/0.25 at 13.2 calls/min (c=16) / 21.6 (c=32), and that server did the full run. Helper scripts are in [`scripts/`](scripts/README.md). The cache key includes the model name, so answers from each server stay separate.

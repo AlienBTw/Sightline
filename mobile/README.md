@@ -25,7 +25,7 @@ Tapping a notification opens the event, after sign-in if needed.
 - Tokens never go into URLs. The exceptions are the short-lived signed media links (`?st=`, 15 min) and the one-time WebSocket ticket (60 s), both issued by the backend.
 - HTTPS only. Plain HTTP is allowed only for `127.0.0.1`, `localhost` and `10.0.2.2` (emulator and USB development), and Android's network security config enforces the same rule.
 - No secrets in the app bundle. The server URL is entered at sign-in, and there is an optional build-time default (`SIGHTLINE_DEFAULT_SERVER`) that isn't a secret.
-- The release keystore and its passwords live outside the repo (by default `F:\models\keys\`) and reach Gradle through environment variables.
+- The release keystore and its passwords live outside the repo (the `-KeyDir` argument of `scripts\build-apk.ps1`) and reach Gradle through environment variables.
 - Minimal permissions: internet and notifications. Storage, microphone and overlay permissions are removed, and app backup is off.
 
 ## Setup
@@ -69,14 +69,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-apk.ps1 [-Defa
 ```
 
 The script:
-1. creates a release keystore on first run (`F:\models\keys\sightline-release.jks`, with a random password saved next to it in `sightline-release.properties`, outside the repo). **Back both files up.** Updates to an installed app must be signed with the same key.
+1. creates a release keystore on first run (`sightline-release.jks` under `-KeyDir`, with a random password saved next to it in `sightline-release.properties`, both outside the repo). **Back both files up.** Updates to an installed app must be signed with the same key.
 2. runs `npx expo prebuild` to generate `android/` (gitignored, regenerated from `app.config.ts`).
 3. runs `gradlew assembleRelease` (R8 and resource shrinking on, ABIs arm64-v8a, armeabi-v7a and x86_64).
-4. writes two APKs, each with a `.sha256` file: `F:\sightline_release\sightline.apk` (universal: phones plus x86_64 emulators) and `sightline-arm64.apk` (arm64 phones only, which covers almost every phone since 2017, and is much smaller). `-UniversalOnly` skips the second one.
+4. writes two APKs, each with a `.sha256` file, into `-OutDir`: `sightline.apk` (universal: phones plus x86_64 emulators) and `sightline-arm64.apk` (arm64 phones only, which covers almost every phone since 2017, and is much smaller). `-UniversalOnly` skips the second one.
 
-If the repo sits in a long folder, the script mirrors `mobile\` to a short folder (`F:\sightline_build\mobile`, set with `-BuildDir`) and builds there. Otherwise the native (CMake/ninja) steps fail on Windows' 260-character path limit. The mirror keeps its `android\` folder between runs, so later builds are incremental.
+If the repo sits in a long folder, the script mirrors `mobile\` to a short folder (`-BuildDir`, then `mobile` under it) and builds there. Otherwise the native (CMake/ninja) steps fail on Windows' 260-character path limit. The mirror keeps its `android\` folder between runs, so later builds are incremental.
 
-Run it detached if your terminal sessions are short, with output going to `F:\models\logs\mobile_build.log`, and check on it with `scripts\build-status.ps1`. The first build takes 10 to 20 minutes and later builds are faster.
+Run it detached if your terminal sessions are short, and check on it with `scripts\build-status.ps1`. The first build takes 10 to 20 minutes and later builds are faster.
 
 **Cloud alternative (EAS):** `npm i -g eas-cli`, `eas login`, `eas init` (this sets the project ID; pass it as `EAS_PROJECT_ID`), then `eas build -p android --profile preview` with a profile that has `"android": {"buildType": "apk"}`. EAS manages the keystore for you.
 
@@ -99,7 +99,7 @@ Android 8.0 or later is supported (Android 13+ asks for notification permission)
 
 - **Without Firebase (the default build):** alerts arrive over the WebSocket. While the app is open you get an in-app banner, and while it's in the background you get a local notification, for as long as Android keeps the app alive. Tapping either opens the event.
 - **Remote push (app closed):** the backend already sends Expo push messages. For the phone to receive them, the build needs Firebase Cloud Messaging:
-  1. Create a Firebase project and add an Android app with package `com.alienbtw.sightline`. Download `google-services.json` (keep it out of git) and build with `$env:SIGHTLINE_GOOGLE_SERVICES="C:\path\to\google-services.json"`.
+  1. Create a Firebase project and add an Android app with package `com.alienbtw.sightline`. Download `google-services.json` (keep it out of git) and set `$env:SIGHTLINE_GOOGLE_SERVICES` to that file before the build.
   2. Create an Expo project (`eas init`) and build with `$env:EAS_PROJECT_ID="<id>"`. The app needs this ID to get an Expo push token.
   3. Upload the FCM V1 service-account key to the Expo project (`eas credentials`, Android, then Push Notifications).
   4. Rebuild. Settings then shows "Push: registered", and "Send test push" arrives even with the app closed.

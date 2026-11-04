@@ -1,5 +1,7 @@
 # Glimmer label eval (2026-10-31T10:23:53+01:00)
 
+Earlier attempt on Ollama `muse-glimmer:30b`. This is not the full labelling run. The full run is `full_run_summary_vllm.md` (`RedHatAI/Muse-Glimmer-30B-INT4` on vLLM, served as `muse-glimmer-30b-int4-vllm`).
+
 | Config | F7 P / R / unc | F8 P / R / unc | F9 P / R / unc | Uncertain (all F1–F10) | Present (all) | s/call (mean) | calls/min |
 |---|---|---|---|---|---|---|---|
 | v1:none | 1.00 / 1.00 / 0.00 | – / 0.00 / 1.00 | 1.00 / 0.25 / 0.86 | 0.59 | 0.05 | 11.80 | – |

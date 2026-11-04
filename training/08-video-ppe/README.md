@@ -1,6 +1,6 @@
 # 08 - Video PPE labels and shortcut check (F2, F5)
 
-**Goal:** give F2 (no head protection) and F5 (no hi-vis vest) labels on real video, retrain those two outputs of the concept-bottleneck head, and check on held-out clips whether the head learned the helmet and the vest or only the video source.
+**Goal:** stage 2 of labelling. Stage 1 ([`02-labeling`](../02-labeling/README.md)) used local Muse Glimmer 30B 4-bit (`RedHatAI/Muse-Glimmer-30B-INT4`) on vLLM, served as `muse-glimmer-30b-int4-vllm` (tensor parallel), and those weak F1–F10 labels trained the initial head. Stage 2 relabels the PPE video clips (helmet and vest) with SAM 3.1 boxes and Muse Spark 1.3 Contributor (Meta Model API) to fix the source shortcut, then checks on held-out clips whether a retrained head learned the helmet and the vest or only the video source.
 
 ## Inputs and licences
 
@@ -13,10 +13,11 @@ The Pexels split is grouped by `pexels_id // 10000`, and the demo clips are kept
 
 ## Labels
 
-- **Muse Spark 1.3 Contributor** (`muse-spark-1.3-contributor`, Meta Model API) looks at 3 frames per clip and answers `present` / `absent` / `uncertain` for F2 and F5. That took 386 calls for 383 clips (4 answers could not be parsed; 3 were run again).
-- The planned SAM 3.1 boxes are **not** in these labels. The open `facebook/sam3.1` weights are gated on Hugging Face and the download was refused, so the labeller ran Muse-only and the window labels carry the clip verdict. The live pipeline uses SAM 3.1 through the Meta Model API instead (circles only).
+Stage 2 uses both models. **Muse Spark 1.3 Contributor** (`muse-spark-1.3-contributor`, Meta Model API) looks at 3 frames per clip and answers `present` / `absent` / `uncertain` for F2 and F5. That took 386 calls for 383 clips (4 answers could not be parsed; 3 were run again). **SAM 3.1** boxes are the window supervision in the phase 2 label file (below).
+
+An earlier pass in this folder used the Muse Spark clip verdicts without SAM boxes, because the official `facebook/sam3.1` download was refused. Those rows are `training/data/ppe_video_labels.jsonl` (745 window rows; not committed with the data), and the window labels there carry the clip verdict. The stage 2 file adds local SAM 3.1 boxes (`unsloth/sam3.1`, SAM License). The live pipeline still uses SAM 3.1 through the Meta Model API for circles.
+
 - Pexels F2: 49 present, 32 absent, 6 uncertain. Pexels F5: 57 present, 29 absent, 1 uncertain. Voxel51 F2: 279 present, 17 uncertain. Voxel51 F5: 285 present, 11 uncertain. Voxel51 has no `absent` clip for either factor, so the two sources differ in label balance as well as in look.
-- Merged labels: `training/data/ppe_video_labels.jsonl` (745 window rows; not committed with the data).
 
 ## How to run
 
@@ -43,7 +44,7 @@ $PY training/04-head/train_head.py train --name ppe_ft_frz --gpu 1 --hidden 512 
 $PY training/04-head/ppe_shortcut_eval.py --gpu 1
 ```
 
-`muse_verify.py` calls a paid API; its `--max-calls` default is 0. Test the setup with `--dry-run` first.
+`muse_verify.py` calls a paid API; its `--max-calls` default is 0. Test the setup with `--dry-run` first. The command above builds the earlier Muse-only file. Stage 2 training points `--ppe-labels` at `training/data/ppe_video_labels_sam.jsonl` after `sam_label.py` (see [`tools/labeling/README.md`](../../tools/labeling/README.md)).
 
 ## Results
 
@@ -51,7 +52,7 @@ Held-out set: Pexels test + demo_eval (F2 12 positive / 6 negative clips, F5 16 
 
 | Checkpoint | Training | F2 held-out AUROC | F5 held-out AUROC | F2 domain AUROC | F5 domain AUROC |
 |---|---|---|---|---|---|
-| **h3_wide** (live) | Glimmer weak labels | 0.403 [0.117, 0.736] | 0.875 | 0.972 | 0.945 |
+| **h3_wide** (live) | stage 1 Glimmer weak labels (vLLM INT4) | 0.403 [0.117, 0.736] | 0.875 | 0.972 | 0.945 |
 | ppe_ft_frz | all Muse labels, only F2/F5 trainable | 0.389 | 0.750 | 1.000 | 1.000 |
 | ppe_ft_all | all Muse labels, whole head | 0.556 | 0.750 | 1.000 | 1.000 |
 | ppe_ft_frz_w05 | as ppe_ft_frz, PPE loss weight 0.5 | 0.194 [0.000, 0.444] | 0.875 | 1.000 | 1.000 |
@@ -68,7 +69,7 @@ Every retrain separates the two video sources (domain AUROC up to 1.00) without 
 
 ## Phase 2 - SAM 3.1 (unsloth) boxes (2026-11-04)
 
-Phase 2 puts local SAM 3.1 boxes (unsloth/sam3.1, SAM License, 19 Nov 2025) on the same 383 clips as window supervision for F2 (no head protection) and F5 (no hi-vis vest), retrains three heads from h3_wide, and checks whether any of them separate helmet from bare head on held-out Pexels clips. Detail and the licence notes are in [`LOG.md`](LOG.md).
+This is the stage 2 label set: local SAM 3.1 boxes (unsloth/sam3.1, SAM License, 19 Nov 2025) on the same 383 clips, together with the Muse Spark 1.3 Contributor verdicts, as window supervision for F2 (no head protection) and F5 (no hi-vis vest). The file is `training/data/ppe_video_labels_sam.jsonl` (383 clips, 2,822 frames; window boxes F2 11,861 positive / 3,735 negative, F5 10,955 / 2,537). Three heads were retrained from h3_wide to see whether any of them separate helmet from bare head on held-out Pexels clips. Detail and the licence notes are in [`LOG.md`](LOG.md). The Muse call count stays 386.
 
 Held-out is Pexels test + demo_eval (F2 12 positive / 6 negative, F5 16 / 2), from the Summary rows in [`../04-head/results/PPE_SHORTCUT.md`](../04-head/results/PPE_SHORTCUT.md). Domain AUROC is how well the factor score alone separates Voxel51 from Pexels. F1 patch is Zenodo `F1_patch_vs_boxes` on the training `TEST` line. Voxel51 test F2 clip AUROC is the `PPE_TEST_CLIP` line (117 clips, 116 positive / 1 negative). Demo replay is `data/demo/sightline_demo.mp4` (F2 fraction of steps at or above the run's own threshold). The grinder column is F2 max versus that threshold on `data/demo_extra/pexels_8987012_bare_head_grinder.mp4`.
 
@@ -83,4 +84,4 @@ h3_wide has no `PPE_TEST_CLIP` line. Its own test F2 is 95/95 present, so that A
 
 **Gate:** F2 95% CI lower bound > 0.5, and F2 domain AUROC drops versus h3_wide, and F1 patch does not regress.
 
-**Verdict:** only C passes the F2 gate (0.792 [0.549, 1.000], domain 0.671 vs 0.972, F1 patch 0.991/0.940 vs 0.992/0.939). F5 regresses from 0.875 to 0.656 (CI [0.353, 0.941]). C is not promoted. h3_wide stays live by Alien's decision. A and B miss the F2 interval (lower bounds 0.333 and 0.219).
+**Verdict:** only C passes the F2 gate (0.792 [0.549, 1.000], domain 0.671 vs 0.972, F1 patch 0.991/0.940 vs 0.992/0.939). F5 regresses from 0.875 to 0.656 (CI [0.353, 0.941]). C is not promoted. h3_wide stays live. A and B miss the F2 interval (lower bounds 0.333 and 0.219).

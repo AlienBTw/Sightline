@@ -1,9 +1,11 @@
 # PPE shortcut eval
 
+Stage 1 trained the initial head on weak F1–F10 labels from local Muse Glimmer 30B 4-bit (`RedHatAI/Muse-Glimmer-30B-INT4`) on vLLM. Stage 2 relabelled the PPE video clips (helmet/vest) with SAM 3.1 boxes and Muse Spark 1.3 Contributor. The numbers below are unchanged.
+
 Clip score: sigmoid of the factor logit pooled over every patch of every window.
 Window score: max sigmoid(patch evidence) inside the window.
 Pexels held-out is test + demo_eval. Voxel51 scores are val and test.
-F2 and F5 labels are the Muse Spark clip verdicts. A null verdict is excluded.
+Held-out F2 and F5 scores use the Muse Spark clip verdicts. A null verdict is excluded. The `ppe_sam_*` rows were trained on the stage 2 labels (SAM 3.1 boxes plus those Muse Spark verdicts). The earlier `ppe_ft_*` and `ppe_pex_*` rows used the Muse Spark clip labels only. The numbers in this file are unchanged.
 A split with only one class is n/a.
 
 Domain AUROC separates Voxel51 (positive class) from Pexels among held-out clips
@@ -43,7 +45,7 @@ PPE labels replaced F2/F5 on 658 Voxel51 clips; 0 clips had no PPE row and stay 
 
 ## h3_wide
 
-Checkpoint `/mnt/c/projects/Meta Global AI Developer Hackathon/Sightline/training/04-head/checkpoints/h3_wide.pt`, hidden 512, dropout 0.2.
+Checkpoint `training/04-head/checkpoints/h3_wide.pt`, hidden 512, dropout 0.2.
 
 ### Pexels clip metrics
 
@@ -80,7 +82,7 @@ Checkpoint `/mnt/c/projects/Meta Global AI Developer Hackathon/Sightline/trainin
 
 ## ppe_ft_all
 
-Checkpoint `/mnt/c/projects/Meta Global AI Developer Hackathon/Sightline/training/04-head/checkpoints/ppe_ft_all.pt`, hidden 512, dropout 0.2.
+Checkpoint `training/04-head/checkpoints/ppe_ft_all.pt`, hidden 512, dropout 0.2.
 
 ### Pexels clip metrics
 
@@ -117,7 +119,7 @@ Checkpoint `/mnt/c/projects/Meta Global AI Developer Hackathon/Sightline/trainin
 
 ## ppe_ft_frz
 
-Checkpoint `/mnt/c/projects/Meta Global AI Developer Hackathon/Sightline/training/04-head/checkpoints/ppe_ft_frz.pt`, hidden 512, dropout 0.2.
+Checkpoint `training/04-head/checkpoints/ppe_ft_frz.pt`, hidden 512, dropout 0.2.
 
 ### Pexels clip metrics
 
@@ -154,7 +156,7 @@ Checkpoint `/mnt/c/projects/Meta Global AI Developer Hackathon/Sightline/trainin
 
 ## ppe_ft_frz_w05
 
-Checkpoint `/mnt/c/projects/Meta Global AI Developer Hackathon/Sightline/training/04-head/checkpoints/ppe_ft_frz_w05.pt`, hidden 512, dropout 0.2.
+Checkpoint `training/04-head/checkpoints/ppe_ft_frz_w05.pt`, hidden 512, dropout 0.2.
 
 ### Pexels clip metrics
 
@@ -191,7 +193,7 @@ Checkpoint `/mnt/c/projects/Meta Global AI Developer Hackathon/Sightline/trainin
 
 ## ppe_pex_all
 
-Checkpoint `/mnt/c/projects/Meta Global AI Developer Hackathon/Sightline/training/04-head/checkpoints/ppe_pex_all.pt`, hidden 512, dropout 0.2.
+Checkpoint `training/04-head/checkpoints/ppe_pex_all.pt`, hidden 512, dropout 0.2.
 
 ### Pexels clip metrics
 
@@ -228,7 +230,7 @@ Checkpoint `/mnt/c/projects/Meta Global AI Developer Hackathon/Sightline/trainin
 
 ## ppe_pex_frz
 
-Checkpoint `/mnt/c/projects/Meta Global AI Developer Hackathon/Sightline/training/04-head/checkpoints/ppe_pex_frz.pt`, hidden 512, dropout 0.2.
+Checkpoint `training/04-head/checkpoints/ppe_pex_frz.pt`, hidden 512, dropout 0.2.
 
 ### Pexels clip metrics
 
@@ -265,7 +267,7 @@ Checkpoint `/mnt/c/projects/Meta Global AI Developer Hackathon/Sightline/trainin
 
 ## ppe_sam_frz
 
-Checkpoint `/mnt/c/projects/Meta Global AI Developer Hackathon/Sightline/training/04-head/checkpoints/ppe_sam_frz.pt`, hidden 512, dropout 0.2.
+Checkpoint `training/04-head/checkpoints/ppe_sam_frz.pt`, hidden 512, dropout 0.2.
 
 ### Pexels clip metrics
 
@@ -302,7 +304,7 @@ Checkpoint `/mnt/c/projects/Meta Global AI Developer Hackathon/Sightline/trainin
 
 ## ppe_sam_shwd_all
 
-Checkpoint `/mnt/c/projects/Meta Global AI Developer Hackathon/Sightline/training/04-head/checkpoints/ppe_sam_shwd_all.pt`, hidden 512, dropout 0.2.
+Checkpoint `training/04-head/checkpoints/ppe_sam_shwd_all.pt`, hidden 512, dropout 0.2.
 
 ### Pexels clip metrics
 
@@ -339,7 +341,7 @@ Checkpoint `/mnt/c/projects/Meta Global AI Developer Hackathon/Sightline/trainin
 
 ## ppe_sam_shwd_frz
 
-Checkpoint `/mnt/c/projects/Meta Global AI Developer Hackathon/Sightline/training/04-head/checkpoints/ppe_sam_shwd_frz.pt`, hidden 512, dropout 0.2.
+Checkpoint `training/04-head/checkpoints/ppe_sam_shwd_frz.pt`, hidden 512, dropout 0.2.
 
 ### Pexels clip metrics
 
