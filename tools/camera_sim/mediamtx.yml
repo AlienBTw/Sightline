@@ -1,0 +1,51 @@
+# Sightline camera simulator: MediaMTX acting like an IP camera / NVR.
+# RTSP only (TCP + UDP/RTP), credentials required like a Hikvision/Dahua camera.
+logLevel: info
+logDestinations: [stdout]
+api: yes
+apiAddress: 127.0.0.1:9997
+metrics: no
+pprof: no
+playback: no
+rtmp: no
+hls: no
+webrtc: no
+srt: no
+moq: no
+rtsp: yes
+rtspTransports: [udp, tcp]
+rtspAddress: :8554
+rtpAddress: :8050
+rtcpAddress: :8051
+rtspAuthMethods: [basic, digest]
+readTimeout: 10s
+writeTimeout: 10s
+authMethod: internal
+authInternalUsers:
+  # viewer account, like the camera's "admin" user (change it if you expose the rig)
+  - user: admin
+    pass: Sightline2026
+    ips: []
+    permissions:
+      - action: read
+      - action: playback
+  # the ffmpeg publishers (localhost only)
+  - user: publisher
+    pass: pub-local-only
+    ips: ['127.0.0.1', '::1']
+    permissions:
+      - action: publish
+  - user: any
+    pass:
+    ips: ['127.0.0.1', '::1']
+    permissions:
+      - action: api
+paths:
+  # Hikvision-style channel paths: 101 = channel 1 main stream, 102 = channel 1 sub-stream
+  Streams/101: {}
+  Streams/102: {}
+  Streams/201: {}
+  Streams/301: {}
+  # latency probe (barcode timestamp in every frame)
+  Streams/901: {}
+  all_others:
