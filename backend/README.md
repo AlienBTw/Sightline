@@ -53,14 +53,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File backend\scripts\start_backen
 powershell -NoProfile -ExecutionPolicy Bypass -File backend\scripts\stop_backend.ps1    # graceful stop (forced after 45 s)
 ```
 
+`start_backend.ps1` leaves the backend alone when `/health` is already ok. Set `SIGHTLINE_BACKEND_LAUNCHER` (a WSL path to a bash script), or pass `-Launcher`, to run that script instead of `backend/scripts/run_backend.sh`.
+
 Or inside WSL: `bash backend/scripts/run_backend.sh` (foreground), `bash backend/scripts/stop_backend.sh` and `bash backend/scripts/status_backend.sh`.
 
 - The backend listens on `127.0.0.1:8000` in WSL. WSL forwards localhost, so Windows (and ngrok) reach it at `http://127.0.0.1:8000`.
 - The dev console is at `http://127.0.0.1:8000/console/`.
-- Logs go to the directory in `SIGHTLINE_LOG_DIR` (Windows scripts also read `SIGHTLINE_LOG_DIR_WIN`):
+- WSL logs go to `SIGHTLINE_LOG_DIR` (default `<work>/logs`, where `<work>` is `SIGHTLINE_WORK_DIR` or `<repo>/work`). Windows scripts call `Get-SightlineLogDir` in `scripts/_logdir.ps1`: `SIGHTLINE_LOG_DIR_WIN` if it is set, otherwise `<work>\logs`. If that folder is a reparse point Windows cannot open, or it cannot be created or written, they use `LOCALAPPDATA\Sightline\logs`.
   - `backend.log` is the app log, rotated at 10 MB, keeping 5 files.
   - `backend_stdout.log` holds uvicorn warnings and tracebacks, rotated at 20 MB when the backend starts.
-  - The PID file is `sightline_backend.pid`.
+  - The PID file is `sightline_backend.pid`. The Windows launcher also writes `sightline_backend_wsl.pid` (the `wsl.exe` process) in the Windows log folder.
 - A camera loads its V-JEPA model on first start, which takes about 8 s. Models stay pooled on their GPU after a camera stops (about 1.3 GB of VRAM each), so restarting is instant.
 - If a camera was running when the backend stopped, it starts again on the next boot (`SIGHTLINE_AUTOSTART=1`). An uploaded camera stops itself after `SIGHTLINE_UPLOAD_MAX_RUNTIME_S` (30 min by default), so a judge's upload can't fill the event list for days.
 
@@ -86,7 +88,9 @@ Or inside WSL: `bash backend/scripts/run_backend.sh` (foreground), `bash backend
 | `SIGHTLINE_LOGIN_PER_MINUTE` / `SIGHTLINE_API_PER_MINUTE` | 5 / 600 | Rate limits per IP. Login also allows 30 per hour per IP and 10 per 15 min per username |
 | `SIGHTLINE_MJPEG_MAX_SECONDS` / `SIGHTLINE_PREVIEW_QUALITY` | 300 / 60 | Length of one live-view session, and JPEG quality |
 | `SIGHTLINE_API_DOCS` | 0 | `1` serves OpenAPI at `/api/docs` |
-| `SIGHTLINE_LOG_DIR` | a directory outside the repo | Rotating app log. The PowerShell scripts use `SIGHTLINE_LOG_DIR_WIN` for the same folder |
+| `SIGHTLINE_LOG_DIR` | `<work>/logs` | Rotating app log inside WSL. `<work>` is `SIGHTLINE_WORK_DIR` or `<repo>/work` |
+| `SIGHTLINE_LOG_DIR_WIN` | `<work>\logs` | Windows log folder (`ngrok.log`, `watchdog.log`, `sightline_backend_wsl.pid`, mobile build logs). If `<work>\logs` cannot be opened, created, or written, the fallback is `LOCALAPPDATA\Sightline\logs` |
+| `SIGHTLINE_BACKEND_LAUNCHER` | none | WSL path of a bash script. When set, `start_backend.ps1` runs it instead of `backend/scripts/run_backend.sh`. `-Launcher` overrides it. `/health` is still checked first |
 | `SIGHTLINE_HOST` / `SIGHTLINE_PORT` | 127.0.0.1 / 8000 | Bind address, used by `run_backend.sh` |
 
 The pipeline's own variables still apply: `MODEL_API_KEY`, `SAM_BACKEND`, `MUSE_BACKEND`, `MUSE_SPARK_MODEL` (Muse Spark 1.3 Contributor, `muse-spark-1.3-contributor`), `SIGHTLINE_ESCALATION`, `SIGHTLINE_VERIFY_GATES`, `SIGHTLINE_VERIFY_GATE_F2`, `SIGHTLINE_VERIFY_GATE_F5` and `SIGHTLINE_DATA_DIR`. See `.env.example`. F2 (no head protection) and F5 (no hi-vis vest) are published only after Muse Spark confirms them; the event's `verified_by` field and `escalation.verify_gates` carry the badge.
@@ -150,11 +154,14 @@ ngrok isn't installed on the build PC yet (checked Oct 31).
 
 ## Judging uptime (Nov 4-8)
 
-- **Scheduled tasks:** `backend\scripts\register_tasks.ps1` registers three tasks for the current user:
-  - "Sightline Backend": starts the backend at logon.
-  - "Sightline ngrok": starts ngrok at logon.
-  - "Sightline Watchdog": runs every 5 minutes. After 2 failed `/health` checks it restarts the backend, and it restarts ngrok if ngrok isn't running. It logs to `watchdog.log` in the log directory, rotated at 5 MB.
-  - To remove them: `Unregister-ScheduledTask -TaskName "Sightline*" -Confirm:$false`.
+- **Scheduled task:** `backend\scripts\register_tasks.ps1` registers one task for the current user, "Sightline Watchdog". It runs at logon and every 5 minutes (the repeat lasts 3650 days), with `-WindowStyle Hidden`, and ignores a new instance if one is already running. The task is not given machine paths; the scripts read `SIGHTLINE_*` environment variables when they run. Older "Sightline Backend" and "Sightline ngrok" logon tasks are unregistered so they cannot start a second copy.
+  - The watchdog starts only what is down. A healthy process is left alone.
+  - **Camera sim:** MediaMTX and the publisher pid files must be alive (`kill -0`, same defaults as `tools/camera_sim/start_sim.sh`). If one is dead, it starts `start_sim.sh` detached (that script skips anything already alive). `-NoSim` skips this.
+  - **Backend:** after 2 failed `/health` checks in a row it runs `stop_backend.ps1` and then `start_backend.ps1` (which honours `SIGHTLINE_BACKEND_LAUNCHER`). If `/health` fails and no backend process is alive, it starts the backend on that check instead of waiting for a second failure.
+  - **ngrok:** started only when `ngrok` is on `PATH` and no ngrok process is running. `-NoNgrok` skips this.
+  - **`-Report`** (also `-DryRun`) prints one line per service — `sim`, `backend`, `ngrok` — each `healthy` or `would start`, and starts nothing. `would start` means this run would launch or restart it. A backend that failed `/health` once while its process is still alive is left until the next failure, so that line stays `healthy`.
+  - Every action is appended to `watchdog.log` in the Windows log directory, rotated at 5 MB.
+  - Remove it with `Unregister-ScheduledTask -TaskName "Sightline*" -Confirm:$false`.
 - **Power:** set the Windows power plan to never sleep or hibernate, pause Windows Update for Nov 4-8, and use mains power and a wired network if possible.
 - **External check:** point a free uptime monitor at `https://<name>.ngrok-free.app/health`. The endpoint is public and returns numbers only.
 - **Pre-seeded data:** the events under `data/live` (from the demo runs) appear in the feed, and the "Demo workshop (sample video)" camera is registered and ready to start.

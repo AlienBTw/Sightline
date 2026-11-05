@@ -4,7 +4,9 @@
 # - Signs with <work>\keys\sightline-release.jks. On first run it creates the keystore and a random
 #   password, stored ONLY in that folder (work\ is gitignored; override with -KeyDir).
 # - Output: <work>\sightline_release\sightline.apk (universal) and sightline-arm64.apk (phones only, smaller).
-#   Log: <work>\logs\mobile_build.log (when run detached). work\ is <repo>\work, or $env:SIGHTLINE_WORK_DIR.
+#   Log (detached run): mobile_build.log from Get-SightlineLogDir (backend\scripts\_logdir.ps1):
+#   $env:SIGHTLINE_LOG_DIR_WIN, else <work>\logs, else $env:LOCALAPPDATA\Sightline\logs.
+#   work\ is <repo>\work, or $env:SIGHTLINE_WORK_DIR.
 #   If the repo path is too long for the native build, set SIGHTLINE_WORK_DIR or -BuildDir to a short folder.
 param(
   [string]$DefaultServer = "",
@@ -19,6 +21,10 @@ param(
 $ErrorActionPreference = "Continue"
 $repo = (Resolve-Path "$PSScriptRoot\..\..").Path
 $work = if ($env:SIGHTLINE_WORK_DIR) { $env:SIGHTLINE_WORK_DIR } else { Join-Path $repo 'work' }
+. "$PSScriptRoot\..\..\backend\scripts\_logdir.ps1"
+# Detached runs write mobile_build.log, mobile_build.pid and mobile_build.err.log here.
+$logDir = Get-SightlineLogDir
+Write-Verbose "mobile build log dir: $logDir"
 if (-not $KeyDir) { $KeyDir = Join-Path $work 'keys' }
 if (-not $OutDir) { $OutDir = Join-Path $work 'sightline_release' }
 if (-not $BuildDir) { $BuildDir = Join-Path $work 'slb' }

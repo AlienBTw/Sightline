@@ -2,7 +2,8 @@
 #   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-status.ps1
 $repo = (Resolve-Path "$PSScriptRoot\..\..").Path
 $work = if ($env:SIGHTLINE_WORK_DIR) { $env:SIGHTLINE_WORK_DIR } else { Join-Path $repo 'work' }
-$logDir = if ($env:SIGHTLINE_LOG_DIR_WIN) { $env:SIGHTLINE_LOG_DIR_WIN } else { Join-Path $work 'logs' }
+. "$PSScriptRoot\..\..\backend\scripts\_logdir.ps1"
+$logDir = Get-SightlineLogDir
 $log = Join-Path $logDir 'mobile_build.log'
 $pidFile = Join-Path $logDir 'mobile_build.pid'
 if (Test-Path $pidFile) {
